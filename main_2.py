@@ -9,6 +9,7 @@ CELL_SIZE = WIN_WIDTH // GRID_SIZE  # 各セルのピクセルサイズ
 class App:
     def __init__(self):
         # 10x10の配列を作成し、各セルにランダムで0～3の高さを設定
+        #self.grid = [[random.randint(0, 3) for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
         self.grid = [[random.randint(0, 1) for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
         pyxel.init(WIN_WIDTH, WIN_HEIGHT, title="Grid Madness")
         pyxel.load("my_resource.pyxres")

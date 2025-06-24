@@ -3,6 +3,7 @@ import random
 
 # 色定数
 COLOR_OUTLINE = 7
+COLOR_TOP = 11
 COLOR_LEFT = 12
 #COLOR_FLOOR_LEFT = 12
 COLOR_RIGHT = 5
@@ -60,63 +61,28 @@ class App:
                     (iso_x + CELL_SIZE, iso_y + CELL_SIZE // 4),  # 右
                     (iso_x + CELL_SIZE // 2, iso_y + CELL_SIZE // 2)  # 下
                 ]
-                # ひし形をラッパー関数で塗りつぶし
-                self.rect_poly(points[0], points[1], points[2], points[3], h)
-                # 枠線（ラッパー関数で描画）
-                self.rect_polyb(points[0], points[1], points[2], points[3], COLOR_OUTLINE)
-                # ひし形の下の頂点に色番号8で点を描画
-                px, py = points[3]
-                # その点から高さ分だけ下方向に線を引く
-                line_length = h * HEIGHT_UNIT
-                # 左右と中央の頂点から高さ分だけ下方向に線を引く
-                points_bottom = []
-                for idx in [0, 2, 3]:
-                    px, py = points[idx]
-                    line_length = h * HEIGHT_UNIT
-                    points_bottom.append((px, py + line_length))
-                start_left = points[0]
-                end_left = points_bottom[0]
-                end_center = points_bottom[2]
 
-                pyxel.tri(
-                    start_left[0], start_left[1],
-                    end_left[0], end_left[1],
-                    end_center[0], end_center[1],
-                    COLOR_LEFT  # 左側面も色12で統一
-                )
-                # 床の左側の三角形を塗りつぶし（左の点、下の点、中央線の終端）
-                pyxel.tri(
-                    points[0][0], points[0][1],      # 左の点
-                    points[3][0], points[3][1],      # 下（中央）の点
-                    points_bottom[2][0], points_bottom[2][1],  # 中央線の終端
-                    COLOR_LEFT  # 色12で塗りつぶし
-                )
+                # 床ひし形の各頂点座標を直接代入
+                FT = (iso_x + CELL_SIZE // 2, iso_y)                # 上
+                FL = (iso_x, iso_y + CELL_SIZE // 4)                # 左
+                FR = (iso_x + CELL_SIZE, iso_y + CELL_SIZE // 4)    # 右
+                FB = (iso_x + CELL_SIZE // 2, iso_y + CELL_SIZE // 2)  # 下
+                # 壁面の下側の座標（高さ分だけY方向にオフセット）
+                BL = (FL[0], FL[1] + h * HEIGHT_UNIT)   # 左側壁面の下
+                BTB = (FB[0], FB[1] + h * HEIGHT_UNIT)  # 下側壁面の下
+                BR = (FR[0], FR[1] + h * HEIGHT_UNIT)   # 右側壁面の下
 
+                # 左側面をrect_polyで描画
+                self.rect_poly(FL, FB, BTB, BL, COLOR_LEFT)
 
-                # 床の右側の三角形を塗りつぶし（右の点、下の点、中央線の終端）
-                pyxel.tri(
-                    points[2][0], points[2][1],      # 右の点
-                    points[3][0], points[3][1],      # 下（中央）の点
-                    points_bottom[2][0], points_bottom[2][1],  # 中央線の終端
-                    COLOR_RIGHT  # 右側も色5で統一
-                )
+                # 右側面をrect_polyで描画
+                self.rect_poly(FB, FR, BR, BTB, COLOR_RIGHT)                           
 
-                # 右の高さ線の開始点、終端、中央の高さ線の終端で三角形を描画
-                start_right = points[2]
-                end_right = points_bottom[1]
-                end_center = points_bottom[2]
-                pyxel.tri(
-                    #start_right[0], start_right[1],
-                    points[2][0], points[2][1],
-                    end_right[0], end_right[1],
-                    end_center[0], end_center[1],
-                    COLOR_RIGHT  # 右側面を色5で統一
-                )
-                # 最後にもう一度ひし形を描画して床を強調
-                pyxel.line(points[0][0], points[0][1], points[1][0], points[1][1], COLOR_OUTLINE)
-                pyxel.line(points[1][0], points[1][1], points[2][0], points[2][1], COLOR_OUTLINE)
-                pyxel.line(points[2][0], points[2][1], points[3][0], points[3][1], COLOR_OUTLINE)
-                pyxel.line(points[3][0], points[3][1], points[0][0], points[0][1], COLOR_OUTLINE)
+                #上を描画
+                self.rect_poly(FL , FT, FR, FB, COLOR_TOP)
+
+                #Topのアウトラインを描画
+                self.rect_polyb(FT, FL, FB, FR, COLOR_OUTLINE)
 
 
 

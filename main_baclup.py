@@ -26,7 +26,7 @@ class App:
 
         #self.grid = [[random.randint(1, 4) for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
         # 高さや属性を持つグリッドを生成
-        self.fieldgrid = FieldGrid(GRID_SIZE, CELL_SIZE, CELL_SIZE, ISO_X_OFFSET, ISO_Y_OFFSET)        
+        self.fieldgrid = FieldGrid(GRID_SIZE)        
 
         pyxel.init(WIN_WIDTH, WIN_HEIGHT, title="Grid Madness")
         pyxel.load("my_resource.pyxres")
@@ -45,16 +45,16 @@ class App:
             #            self.grid[y][x] = 0
             self.fieldgrid.update_heights()
     #4頂点（左, 上, 右, 下）で囲まれた平行四辺形を2つの三角形で塗りつぶす
-    def rect_poly(self, p0, p1, p2, p3, color):
-        pyxel.tri(p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], color)
-        pyxel.tri(p0[0], p0[1], p2[0], p2[1], p3[0], p3[1], color)
+    def rect_poly(self, p0, p1, p2, p3, col):
+        pyxel.tri(p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], col)
+        pyxel.tri(p0[0], p0[1], p2[0], p2[1], p3[0], p3[1], col)
 
     #4頂点（左, 上, 右, 下）で囲まれた平行四辺形の枠線を描画
-    def rect_polyb(self, p0, p1, p2, p3, color):
-        pyxel.line(p0[0], p0[1], p1[0], p1[1], color)
-        pyxel.line(p1[0], p1[1], p2[0], p2[1], color)
-        pyxel.line(p2[0], p2[1], p3[0], p3[1], color)
-        pyxel.line(p3[0], p3[1], p0[0], p0[1], color)
+    def rect_polyb(self, p0, p1, p2, p3, col):
+        pyxel.line(p0[0], p0[1], p1[0], p1[1], col)
+        pyxel.line(p1[0], p1[1], p2[0], p2[1], col)
+        pyxel.line(p2[0], p2[1], p3[0], p3[1], col)
+        pyxel.line(p3[0], p3[1], p0[0], p0[1], col)
 
     def draw(self):
         pyxel.cls(0)

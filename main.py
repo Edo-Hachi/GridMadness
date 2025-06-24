@@ -22,7 +22,9 @@ ISO_Y_OFFSET = 16   # Y方向のオフセット
 class App:
     def __init__(self):
         # 10x10の配列を作成し、各セルにランダムで1～3の高さを設定
-        self.grid = [[random.randint(1, 3) for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+        self.frame_count = 0
+
+        self.grid = [[random.randint(1, 4) for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
         pyxel.init(WIN_WIDTH, WIN_HEIGHT, title="Grid Madness")
         pyxel.load("my_resource.pyxres")
         pyxel.run(self.update, self.draw)
@@ -31,6 +33,13 @@ class App:
         # Esc Key Down
         if pyxel.btn(pyxel.KEY_ESCAPE):
             pyxel.quit()
+        self.frame_count += 1
+        if self.frame_count % 5 == 0:  # 10フレームごとに更新
+            for y in range(GRID_SIZE):
+                for x in range(GRID_SIZE):
+                    self.grid[y][x] += 1
+                    if self.grid[y][x] > 4:
+                        self.grid[y][x] = 0
 
     def rect_poly(self, p0, p1, p2, p3, col):
         """

@@ -48,6 +48,6 @@ class FieldGrid:
     def update_heights(self):
         for row in self.tiles:
             for tile in row:
-                tile.height += 2
+                tile.height += 0
                 if tile.height > 15:
                     tile.height = 0

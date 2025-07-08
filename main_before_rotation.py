@@ -1,6 +1,5 @@
 import pyxel
 import random
-import math
 from FieldGrid import FieldGrid
 
 # 色定数
@@ -30,16 +29,10 @@ class App:
         # ズーム機能
         self.zoom = 1.0  # ズーム倍率
         
-        # 回転システム
-        self.rotation_step = 15  # 回転ステップ角度（設定可能）
-        self.rotation_index = 0  # 現在の回転インデックス
-        self.max_rotations = 360 // self.rotation_step  # 24方向
-        
         # 初期位置を記憶（リセット用）
         self.initial_iso_x_offset = self.iso_x_offset
         self.initial_iso_y_offset = self.iso_y_offset
         self.initial_zoom = self.zoom
-        self.initial_rotation_index = self.rotation_index
 
         # マウス関連
         self.mouse_x = 0
@@ -84,18 +77,11 @@ class App:
             if self.zoom < 0.3:  # 最小0.3倍まで
                 self.zoom = 0.3
                 
-        # 回転処理
-        if pyxel.btnp(pyxel.KEY_Q):  # btnp = 押した瞬間のみ
-            self.rotation_index = (self.rotation_index - 1) % self.max_rotations
-        if pyxel.btnp(pyxel.KEY_W):
-            self.rotation_index = (self.rotation_index + 1) % self.max_rotations
-                
         # リセット処理
         if pyxel.btn(pyxel.KEY_A):
             self.iso_x_offset = self.initial_iso_x_offset
             self.iso_y_offset = self.initial_iso_y_offset
             self.zoom = self.initial_zoom
-            self.rotation_index = self.initial_rotation_index
             
         # マウスクリックでタイル選択
         if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
@@ -105,35 +91,6 @@ class App:
         self.frame_count += 1
         if self.frame_count % 10 == 0:  # 10フレームごとに更新
             self.fieldgrid.update_heights()
-    
-    @property
-    def current_angle(self):
-        """現在の回転角度を取得"""
-        return self.rotation_index * self.rotation_step
-    
-    def get_rotated_coordinates(self, grid_x, grid_y):
-        """グリッド座標を回転座標に変換"""
-        angle_rad = math.radians(self.current_angle)
-        
-        # グリッド中心からの相対座標
-        center = GRID_SIZE // 2
-        rel_x = grid_x - center
-        rel_y = grid_y - center
-        
-        # 回転変換
-        rotated_x = rel_x * math.cos(angle_rad) - rel_y * math.sin(angle_rad)
-        rotated_y = rel_x * math.sin(angle_rad) + rel_y * math.cos(angle_rad)
-        
-        return rotated_x, rotated_y
-    
-    def get_tile_depth(self, grid_x, grid_y):
-        """タイルの描画深度を計算（Zソート用）"""
-        rotated_x, rotated_y = self.get_rotated_coordinates(grid_x, grid_y)
-        tile = self.fieldgrid[grid_y][grid_x]
-        
-        # 深度 = 回転後のY座標 + 高さ（後ろにあるものほど先に描画）
-        depth = rotated_y - tile.height * 0.1
-        return depth
 
     def is_point_in_center_rect(self, point_x, point_y, diamond_center_x, diamond_center_y, diamond_width, diamond_height):
         """ひし形の中心にある矩形での当たり判定"""
@@ -202,85 +159,70 @@ class App:
         center_x = WIN_WIDTH // 2
         center_y = WIN_HEIGHT // 2
         
-        # Zソート: 深度順にタイルを並べる
-        tiles_with_depth = []
         for y in range(GRID_SIZE):
             for x in range(GRID_SIZE):
-                depth = self.get_tile_depth(x, y)
-                tiles_with_depth.append((depth, x, y))
-        
-        # 深度順にソート（小さい値から大きい値へ = 奥から手前へ）
-        tiles_with_depth.sort(key=lambda item: item[0])
-        
-        # ソート済みの順序で描画
-        for depth, x, y in tiles_with_depth:
-            tile = self.fieldgrid[y][x]
-            h = tile.height
-            
-            # 回転座標を取得
-            rotated_x, rotated_y = self.get_rotated_coordinates(x, y)
-            
-            # 回転後のアイソメトリック座標計算
-            base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
-            base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + self.iso_y_offset - h * HEIGHT_UNIT
-            
-            # ズーム適用（ウィンドウ中心を基準）
-            iso_x = center_x + (base_iso_x - center_x) * self.zoom
-            iso_y = center_y + (base_iso_y - center_y) * self.zoom
+                tile = self.fieldgrid[y][x]
+                h = tile.height
+                
+                # 基本座標計算
+                base_iso_x = (x - y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
+                base_iso_y = (x + y) * (CELL_SIZE // 4) + self.iso_y_offset - h * HEIGHT_UNIT
+                
+                # ズーム適用（ウィンドウ中心を基準）
+                iso_x = center_x + (base_iso_x - center_x) * self.zoom
+                iso_y = center_y + (base_iso_y - center_y) * self.zoom
 
-            # 床ひし形の各頂点座標を直接代入（ズーム適用済み）
-            scaled_cell_size = int(CELL_SIZE * self.zoom)
-            FT = (iso_x + scaled_cell_size // 2, iso_y)                # 上
-            FL = (iso_x, iso_y + scaled_cell_size // 4)                # 左
-            FR = (iso_x + scaled_cell_size, iso_y + scaled_cell_size // 4)    # 右
-            FB = (iso_x + scaled_cell_size // 2, iso_y + scaled_cell_size // 2)  # 下
-            
-            # 壁面の下側の座標（高さ分だけY方向にオフセット）
-            scaled_height_unit = int(HEIGHT_UNIT * self.zoom)
-            BL = (FL[0], FL[1] + h * scaled_height_unit)   # 左側壁面の下
-            BTB = (FB[0], FB[1] + h * scaled_height_unit)  # 下側壁面の下
-            BR = (FR[0], FR[1] + h * scaled_height_unit)   # 右側壁面の下
+                # 床ひし形の各頂点座標を直接代入（ズーム適用済み）
+                scaled_cell_size = int(CELL_SIZE * self.zoom)
+                FT = (iso_x + scaled_cell_size // 2, iso_y)                # 上
+                FL = (iso_x, iso_y + scaled_cell_size // 4)                # 左
+                FR = (iso_x + scaled_cell_size, iso_y + scaled_cell_size // 4)    # 右
+                FB = (iso_x + scaled_cell_size // 2, iso_y + scaled_cell_size // 2)  # 下
+                
+                # 壁面の下側の座標（高さ分だけY方向にオフセット）
+                scaled_height_unit = int(HEIGHT_UNIT * self.zoom)
+                BL = (FL[0], FL[1] + h * scaled_height_unit)   # 左側壁面の下
+                BTB = (FB[0], FB[1] + h * scaled_height_unit)  # 下側壁面の下
+                BR = (FR[0], FR[1] + h * scaled_height_unit)   # 右側壁面の下
 
-            # 色の決定
-            top_color = COLOR_TOP
-            left_color = COLOR_LEFT
-            right_color = COLOR_RIGHT
-            
-            # マウスオーバーまたは選択状態の場合は上面の色のみ変更
-            is_hovered = self.hovered_tile == (x, y)
-            is_selected = self.selected_tile == (x, y)
-            
-            if is_selected:
-                top_color = COLOR_SELECTED
-            elif is_hovered:
-                top_color = COLOR_HOVER
+                # 色の決定
+                top_color = COLOR_TOP
+                left_color = COLOR_LEFT
+                right_color = COLOR_RIGHT
+                
+                # マウスオーバーまたは選択状態の場合は上面の色のみ変更
+                is_hovered = self.hovered_tile == (x, y)
+                is_selected = self.selected_tile == (x, y)
+                
+                if is_selected:
+                    top_color = COLOR_SELECTED
+                elif is_hovered:
+                    top_color = COLOR_HOVER
 
-            # 左側面をrect_polyで描画
-            self.rect_poly(FL, FB, BTB, BL, left_color)
+                # 左側面をrect_polyで描画
+                self.rect_poly(FL, FB, BTB, BL, left_color)
 
-            # 右側面をrect_polyで描画
-            self.rect_poly(FB, FR, BR, BTB, right_color)                           
+                # 右側面をrect_polyで描画
+                self.rect_poly(FB, FR, BR, BTB, right_color)                           
 
-            #上を描画
-            self.rect_poly(FL , FT, FR, FB, top_color)
+                #上を描画
+                self.rect_poly(FL , FT, FR, FB, top_color)
 
-            #Topのアウトラインを描画
-            self.rect_polyb(FT, FL, FB, FR, COLOR_OUTLINE)
+                #Topのアウトラインを描画
+                self.rect_polyb(FT, FL, FB, FR, COLOR_OUTLINE)
 
         # デバッグ情報表示
-        pyxel.text(0, 0, f"Rotation: {self.current_angle}deg", 7)
-        pyxel.text(0, 8, f"Index: {self.rotation_index}/{self.max_rotations-1}", 7)
-        
         if self.hovered_tile:
             x, y = self.hovered_tile
             tile = self.fieldgrid[y][x]
-            pyxel.text(0, 16, f"Hover: ({x}, {y})", 7)
-            pyxel.text(0, 24, f"Height: {tile.height}", 7)
-            pyxel.text(0, 32, f"Type: {tile.ground_type}", 7)
+            pyxel.text(0, 0, f"Mouse: ({self.mouse_x}, {self.mouse_y})", 7)
+            pyxel.text(0, 8, f"Hover: ({x}, {y})", 7)
+            pyxel.text(0, 16, f"Height: {tile.height}", 7)
+            pyxel.text(0, 24, f"Type: {tile.ground_type}", 7)
         
         if self.selected_tile:
             x, y = self.selected_tile
-            pyxel.text(0, 40, f"Selected: ({x}, {y})", 9)
+            pyxel.text(0, 32, f"Selected: ({x}, {y})", 9)
 
 if __name__ == '__main__':
     App()

@@ -1,12 +1,12 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python: main.py 実行",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/main.py",
-            "console": "integratedTerminal"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: main.py",  // 実行時に選択する構成名
+      "type": "python",           // 実行対象がPython
+      "request": "launch",        // 実行（launch）かアタッチ（attach）か
+      "program": "${workspaceFolder}/main.py", // 実行するファイルのパス
+      "console": "integratedTerminal"          // 実行時に使うコンソール（通常これ）
+    }
+  ]
 }

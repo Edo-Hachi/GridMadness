@@ -12,8 +12,8 @@ COLOR_HEIGHT_LINE = 8
 COLOR_HOVER = 10  # マウスオーバー時の色（緑）
 COLOR_SELECTED = 9  # 選択時の色（青）
 
-WIN_WIDTH = 128
-WIN_HEIGHT = 128
+WIN_WIDTH = 256
+WIN_HEIGHT = 256
 GRID_SIZE = 10  # グリッドの数（10x10）
 CELL_SIZE = WIN_WIDTH // GRID_SIZE  # 各セルのピクセルサイズ
 HEIGHT_UNIT = 1  # 1段あたりの高さ（ピクセル）
@@ -47,6 +47,7 @@ class App:
         self.hovered_tile = None  # マウスオーバー中のタイル
         self.selected_tile = None  # 選択されたタイル
 
+
         # 高さや属性を持つグリッドを生成
         self.fieldgrid = FieldGrid(GRID_SIZE, CELL_SIZE, CELL_SIZE, self.iso_x_offset, self.iso_y_offset)        
 
@@ -54,6 +55,7 @@ class App:
         pyxel.load("my_resource.pyxres")
         pyxel.mouse(True)  # マウスカーソルを表示
         pyxel.run(self.update, self.draw)
+    
 
     def update(self):
         # マウス座標を取得
@@ -101,7 +103,7 @@ class App:
         if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
             if self.hovered_tile:
                 self.selected_tile = self.hovered_tile
-            
+        
         self.frame_count += 1
         if self.frame_count % 10 == 0:  # 10フレームごとに更新
             self.fieldgrid.update_heights()
@@ -134,6 +136,7 @@ class App:
         # 深度 = 回転後のY座標 + 高さ（後ろにあるものほど先に描画）
         depth = rotated_y - tile.height * 0.1
         return depth
+    
 
     def is_point_in_center_rect(self, point_x, point_y, diamond_center_x, diamond_center_y, diamond_width, diamond_height):
         """ひし形の中心にある矩形での当たり判定"""
@@ -147,7 +150,7 @@ class App:
         return left <= point_x <= right and top <= point_y <= bottom
 
     def get_tile_at_mouse(self):
-        """マウス位置のタイルを取得（中心矩形コリジョン）"""
+        """マウス位置のタイルを取得（回転対応コリジョン）"""
         center_x = WIN_WIDTH // 2
         center_y = WIN_HEIGHT // 2
         
@@ -156,9 +159,12 @@ class App:
                 tile = self.fieldgrid[y][x]
                 h = tile.height
                 
-                # 基本座標計算
-                base_iso_x = (x - y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
-                base_iso_y = (x + y) * (CELL_SIZE // 4) + self.iso_y_offset - h * HEIGHT_UNIT
+                # 回転座標を取得
+                rotated_x, rotated_y = self.get_rotated_coordinates(x, y)
+                
+                # 回転後のアイソメトリック座標計算
+                base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
+                base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + self.iso_y_offset - h * HEIGHT_UNIT
                 
                 # ズーム適用（ウィンドウ中心を基準）
                 iso_x = center_x + (base_iso_x - center_x) * self.zoom

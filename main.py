@@ -1,3 +1,5 @@
+"""Pyxel を用いたアイソメトリックグリッド描画アプリケーション."""
+
 import pyxel
 import random
 import math
@@ -19,38 +21,55 @@ CELL_SIZE = WIN_WIDTH // GRID_SIZE  # 各セルのピクセルサイズ
 HEIGHT_UNIT = 1  # 1段あたりの高さ（ピクセル）
 
 class App:
+    """ゲーム全体を管理するアプリケーションクラス."""
+
     def __init__(self):
-        # 10x10の配列を作成し、各セルにランダムで1～3の高さを設定
+        """pyxel 初期化とゲーム状態のセットアップ."""
+        # フレームカウンタ（タイルの高さ更新に利用）
         self.frame_count = 0
         
-        # カメラ位置（スクロール用）
-        self.iso_x_offset = -6  # X方向のオフセット
-        self.iso_y_offset = 16   # Y方向のオフセット
+        # -------------------------
+        # カメラパラメータ
+        # -------------------------
+        # 等角投影座標に加算するスクロール用オフセット
+        self.iso_x_offset = -6
+        self.iso_y_offset = 16
         
-        # ズーム機能
-        self.zoom = 1.0  # ズーム倍率
+        # ズーム倍率（1.0 が等倍）
+        self.zoom = 1.0
         
+        # -------------------------
         # 回転システム
-        self.rotation_step = 15  # 回転ステップ角度（設定可能）
-        self.rotation_index = 0  # 現在の回転インデックス
-        self.max_rotations = 360 // self.rotation_step  # 24方向
+        # -------------------------
+        # 1ステップあたりの回転角度
+        self.rotation_step = 15
+        # 現在の回転ステップ番号
+        self.rotation_index = 0
+        # 0〜self.max_rotations-1 までの値を取る
+        self.max_rotations = 360 // self.rotation_step
         
-        # 初期位置を記憶（リセット用）
+        # -------------------------
+        # 初期値の保存（Aキーでリセットするため）
+        # -------------------------
         self.initial_iso_x_offset = self.iso_x_offset
         self.initial_iso_y_offset = self.iso_y_offset
         self.initial_zoom = self.zoom
         self.initial_rotation_index = self.rotation_index
 
-        # マウス関連
+        # マウス座標や選択状態
         self.mouse_x = 0
         self.mouse_y = 0
         self.hovered_tile = None  # マウスオーバー中のタイル
         self.selected_tile = None  # 選択されたタイル
 
 
-        # 高さや属性を持つグリッドを生成
-        self.fieldgrid = FieldGrid(GRID_SIZE, CELL_SIZE, CELL_SIZE, self.iso_x_offset, self.iso_y_offset)        
+        # -------------------------
+        # グリッド生成
+        # -------------------------
+        # FieldGrid がランダムにタイルを生成する
+        self.fieldgrid = FieldGrid(GRID_SIZE, CELL_SIZE, CELL_SIZE, self.iso_x_offset, self.iso_y_offset)
 
+        # Pyxel 初期化およびゲームループ開始
         pyxel.init(WIN_WIDTH, WIN_HEIGHT, title="Grid Madness")
         pyxel.load("my_resource.pyxres")
         pyxel.mouse(True)  # マウスカーソルを表示
@@ -58,7 +77,9 @@ class App:
     
 
     def update(self):
-        # マウス座標を取得
+        """ユーザー入力の処理とゲーム状態の更新を行う."""
+
+        # 現在のマウス座標を取得
         self.mouse_x = pyxel.mouse_x
         self.mouse_y = pyxel.mouse_y
         
@@ -110,11 +131,11 @@ class App:
     
     @property
     def current_angle(self):
-        """現在の回転角度を取得"""
+        """現在の回転角度(度)を返す."""
         return self.rotation_index * self.rotation_step
     
     def get_rotated_coordinates(self, grid_x, grid_y):
-        """グリッド座標を回転座標に変換"""
+        """現在の回転角度を用いてグリッド座標を回転させる."""
         angle_rad = math.radians(self.current_angle)
         
         # グリッド中心からの相対座標
@@ -129,7 +150,7 @@ class App:
         return rotated_x, rotated_y
     
     def get_tile_depth(self, grid_x, grid_y):
-        """タイルの描画深度を計算（Zソート用）"""
+        """Zソート用にタイルの描画順を決めるための深度値を計算する."""
         rotated_x, rotated_y = self.get_rotated_coordinates(grid_x, grid_y)
         tile = self.fieldgrid[grid_y][grid_x]
         
@@ -139,7 +160,7 @@ class App:
     
 
     def is_point_in_center_rect(self, point_x, point_y, diamond_center_x, diamond_center_y, diamond_width, diamond_height):
-        """ひし形の中心にある矩形での当たり判定"""
+        """中央の矩形を用いたシンプルな当たり判定を行う."""
         # 矩形のサイズ（ひし形の幅・高さの50%を中央に）
         rect_width = diamond_width * 0.5
         rect_height = diamond_height * 0.5
@@ -150,10 +171,11 @@ class App:
         return left <= point_x <= right and top <= point_y <= bottom
 
     def get_tile_at_mouse(self):
-        """マウス位置のタイルを取得（回転対応コリジョン）"""
+        """マウスカーソル下にあるタイルを返す."""
         center_x = WIN_WIDTH // 2
         center_y = WIN_HEIGHT // 2
-        
+
+        # 全タイルを走査してマウス座標との当たりを検出
         for y in range(GRID_SIZE):
             for x in range(GRID_SIZE):
                 tile = self.fieldgrid[y][x]
@@ -162,7 +184,7 @@ class App:
                 # 回転座標を取得
                 rotated_x, rotated_y = self.get_rotated_coordinates(x, y)
                 
-                # 回転後のアイソメトリック座標計算
+                # 回転後のアイソメトリック座標
                 base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
                 base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + self.iso_y_offset - h * HEIGHT_UNIT
                 
@@ -170,7 +192,7 @@ class App:
                 iso_x = center_x + (base_iso_x - center_x) * self.zoom
                 iso_y = center_y + (base_iso_y - center_y) * self.zoom
                 
-                # ひし形の中心座標
+                # ひし形の中心座標（ズーム適用後）
                 diamond_center_x = iso_x + int(CELL_SIZE * self.zoom) // 2
                 diamond_center_y = iso_y + int(CELL_SIZE * self.zoom) // 4
                 
@@ -186,19 +208,20 @@ class App:
         
         return None
 
-    #4頂点（左, 上, 右, 下）で囲まれた平行四辺形を2つの三角形で塗りつぶす
     def rect_poly(self, p0, p1, p2, p3, color):
+        """4頂点の平行四辺形を 2 つの三角形で塗りつぶす."""
         pyxel.tri(p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], color)
         pyxel.tri(p0[0], p0[1], p2[0], p2[1], p3[0], p3[1], color)
 
-    #4頂点（左, 上, 右, 下）で囲まれた平行四辺形の枠線を描画
     def rect_polyb(self, p0, p1, p2, p3, color):
+        """4頂点の平行四辺形に枠線を描画する."""
         pyxel.line(p0[0], p0[1], p1[0], p1[1], color)
         pyxel.line(p1[0], p1[1], p2[0], p2[1], color)
         pyxel.line(p2[0], p2[1], p3[0], p3[1], color)
         pyxel.line(p3[0], p3[1], p0[0], p0[1], color)
 
     def draw(self):
+        """現在のゲーム状態を画面に描画する."""
         pyxel.cls(0)
         
         # マウスオーバー中のタイルを更新
@@ -209,6 +232,7 @@ class App:
         center_y = WIN_HEIGHT // 2
         
         # Zソート: 深度順にタイルを並べる
+        # 各タイルの描画深度を求め配列に格納
         tiles_with_depth = []
         for y in range(GRID_SIZE):
             for x in range(GRID_SIZE):
@@ -219,22 +243,23 @@ class App:
         tiles_with_depth.sort(key=lambda item: item[0])
         
         # ソート済みの順序で描画
+        # 奥から手前の順にタイルを描画
         for depth, x, y in tiles_with_depth:
             tile = self.fieldgrid[y][x]
             h = tile.height
             
-            # 回転座標を取得
+            # 描画位置算出のためにグリッド座標を回転
             rotated_x, rotated_y = self.get_rotated_coordinates(x, y)
             
-            # 回転後のアイソメトリック座標計算
+            # 回転後のアイソメトリック座標を求める
             base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
             base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + self.iso_y_offset - h * HEIGHT_UNIT
             
-            # ズーム適用（ウィンドウ中心を基準）
+            # ウィンドウ中心を基準にズームを適用
             iso_x = center_x + (base_iso_x - center_x) * self.zoom
             iso_y = center_y + (base_iso_y - center_y) * self.zoom
 
-            # 床ひし形の各頂点座標を直接代入（ズーム適用済み）
+            # タイル上面の4頂点（ズーム適用済み）
             scaled_cell_size = int(CELL_SIZE * self.zoom)
             FT = (iso_x + scaled_cell_size // 2, iso_y)                # 上
             FL = (iso_x, iso_y + scaled_cell_size // 4)                # 左

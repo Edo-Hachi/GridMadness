@@ -1,12 +1,17 @@
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Python: main.py",  // 実行時に選択する構成名
-      "type": "python",           // 実行対象がPython
-      "request": "launch",        // 実行（launch）かアタッチ（attach）か
-      "program": "${workspaceFolder}/main.py", // 実行するファイルのパス
-      "console": "integratedTerminal"          // 実行時に使うコンソール（通常これ）
-    }
-  ]
+    // IntelliSense を使用して利用可能な属性を学べます。
+    // 既存の属性の説明をホバーして表示します。
+    // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python デバッガー: 現在のファイル",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "python": "${workspaceFolder}/../venv/bin/python",            
+        }
+    ]
 }

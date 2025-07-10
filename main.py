@@ -208,6 +208,122 @@ class App:
         
         return None
 
+    def draw_compass_labels(self):
+        """グリッドの角に方角文字を表示（固定方角・オフセット付き）"""
+        center_x = WIN_WIDTH // 2
+        center_y = WIN_HEIGHT // 2
+        
+        # 4つの角の座標と、その位置に表示する固定の方角（EとWを入れ替え）
+        compass_positions = [
+            (0, 0, "N"),    # 北西の角に北（N）
+            (0, 9, "W"),    # 北東の角に西（W）← 元はE
+            (9, 0, "E"),    # 南西の角に東（E）← 元はW
+            (9, 9, "S")     # 南東の角に南（S）
+        ]
+        
+        for grid_x, grid_y, direction in compass_positions:
+            # 回転座標を取得
+            rotated_x, rotated_y = self.get_rotated_coordinates(grid_x, grid_y)
+            
+            # 回転後のアイソメトリック座標計算
+            base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
+            base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + self.iso_y_offset
+            
+            # ズーム適用
+            iso_x = center_x + (base_iso_x - center_x) * self.zoom
+            iso_y = center_y + (base_iso_y - center_y) * self.zoom
+            
+            # ひし形の各頂点を計算（タイル描画と同じ計算）
+            scaled_cell_size = int(CELL_SIZE * self.zoom)
+            
+            # ひし形の中心座標を計算
+            tile_center_x = iso_x + scaled_cell_size // 2
+            tile_center_y = iso_y + scaled_cell_size // 4
+            
+            # 全ての方角文字をひし形の中心に表示（微調整のベース）
+            text_x = tile_center_x
+            text_y = tile_center_y
+            
+            # 固定オフセット表（4つの基本方向）
+            up_offset = (5, -30)      # 上方向
+            right_offset = (20, 5)    # 右方向  
+            down_offset = (-5, 30)    # 下方向
+            left_offset = (-20, -5)   # 左方向
+            
+            # 回転に応じてN/E/S/Wに方向を割り当て
+            if 0 <= self.rotation_index <= 6:
+                # 0-6: 基準（N=上, E=右, S=下, W=左）
+                n_offset = up_offset
+                e_offset = right_offset
+                s_offset = down_offset
+                w_offset = left_offset
+                
+            elif 7 <= self.rotation_index <= 12:
+                # 7-12: 90度回転（N=右, E=下, S=左, W=上）
+                n_offset = right_offset
+                e_offset = down_offset
+                s_offset = left_offset
+                w_offset = up_offset
+                
+            elif 13 <= self.rotation_index <= 18:
+                # 13-18: 180度回転（N=下, E=左, S=上, W=右）
+                n_offset = down_offset
+                e_offset = left_offset
+                s_offset = up_offset
+                w_offset = right_offset
+                
+            elif 19 <= self.rotation_index <= 23:
+                # 19-23: 270度回転（N=左, E=上, S=右, W=下）
+                n_offset = left_offset
+                e_offset = up_offset
+                s_offset = right_offset
+                w_offset = down_offset
+            
+            # オフセットを適用
+            n_text_x = tile_center_x + n_offset[0]
+            n_text_y = tile_center_y + n_offset[1]
+            e_text_x = tile_center_x + e_offset[0]
+            e_text_y = tile_center_y + e_offset[1]
+            s_text_x = tile_center_x + s_offset[0]
+            s_text_y = tile_center_y + s_offset[1]
+            w_text_x = tile_center_x + w_offset[0]
+            w_text_y = tile_center_y + w_offset[1]
+
+            # 各方角に応じた位置を適用
+            if direction == "N":
+                text_x = n_text_x
+                text_y = n_text_y
+            elif direction == "E":
+                text_x = e_text_x
+                text_y = e_text_y
+            elif direction == "S":
+                text_x = s_text_x
+                text_y = s_text_y
+            elif direction == "W":
+                text_x = w_text_x
+                text_y = w_text_y
+            
+            # デバッグ表示：N(0度)とW(90度)の座標比較（画面下）
+            if direction == "N" and self.rotation_index == 0:
+                debug_text = f"N0deg:({int(text_x)},{int(text_y)})"
+                pyxel.text(0, 200, debug_text, 7)
+            elif direction == "W" and self.rotation_index == 6:  # 90度は6インデックス
+                debug_text = f"W90deg:({int(text_x)},{int(text_y)})"
+                pyxel.text(0, 208, debug_text, 7)
+            
+            # 現在の回転インデックスも表示
+            if direction == "N" and grid_x == 0 and grid_y == 0:  # 1回だけ表示
+                pyxel.text(0, 216, f"RotIdx:{self.rotation_index}", 7)
+                # タイル中心座標も表示
+                pyxel.text(0, 224, f"Center:({int(tile_center_x)},{int(tile_center_y)})", 7)
+                # 回転座標も表示
+                rot_x, rot_y = self.get_rotated_coordinates(grid_x, grid_y)
+                pyxel.text(0, 232, f"Rot:({rot_x:.1f},{rot_y:.1f})", 7)
+            
+            # 固定の方角文字と座標を描画（赤色）
+            text_with_coords = f"{direction}({grid_x},{grid_y})"
+            pyxel.text(int(text_x), int(text_y), text_with_coords, 8)
+
     def rect_poly(self, p0, p1, p2, p3, color):
         """4頂点の平行四辺形を 2 つの三角形で塗りつぶす."""
         pyxel.tri(p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], color)
@@ -298,6 +414,9 @@ class App:
             #Topのアウトラインを描画
             self.rect_polyb(FT, FL, FB, FR, COLOR_OUTLINE)
 
+        # 方角表示を描画
+        self.draw_compass_labels()
+        
         # デバッグ情報表示
         pyxel.text(0, 0, f"Rotation: {self.current_angle}deg", 7)
         pyxel.text(0, 8, f"Index: {self.rotation_index}/{self.max_rotations-1}", 7)

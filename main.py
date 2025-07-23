@@ -1,5 +1,15 @@
 import pyxel
 import math
+from dataclasses import dataclass
+
+# タイルデータ構造
+@dataclass
+class Tile:
+    """マップタイルの情報を格納するデータクラス"""
+    floor_id: str      # マップタイルのID（xxx_yyy形式）
+    height: int        # 地形高さ
+    attribute: int     # 地形属性
+    color: int         # 地形色（Pyxelカラーコード）
 
 # 定数設定
 WIN_WIDTH = 256
@@ -23,13 +33,27 @@ class App:
         self.iso_y_offset = 0
         self.zoom = 1.0
         
-        # 高さデータ（3x3グリッド用の簡単な高さマップ）
-        # 各タイルの高さを1-3の範囲で設定
-        self.tile_heights = [
-            [1, 2, 1],  # 上段: 低-高-低
-            [2, 3, 2],  # 中段: 高-最高-高
-            [1, 2, 1]   # 下段: 低-高-低
-        ]
+        # テスト用3x3タイルグリッド（Tileオブジェクトで構成）
+        self.tiles = []
+        for y in range(GRID_SIZE):
+            row = []
+            for x in range(GRID_SIZE):
+                # floor_idを座標ベースで生成（xxx_yyy形式）
+                floor_id = f"{x:03d}_{y:03d}"
+                # テスト用高さデータ
+                height_map = [
+                    [1, 2, 1],  # 上段: 低-高-低
+                    [2, 3, 2],  # 中段: 高-最高-高
+                    [1, 2, 1]   # 下段: 低-高-低
+                ]
+                height = height_map[y][x]
+                # テスト用属性と色
+                attribute = height  # 高さに応じた属性
+                color = COLOR_TOP   # とりあえず統一色
+                
+                tile = Tile(floor_id=floor_id, height=height, attribute=attribute, color=color)
+                row.append(tile)
+            self.tiles.append(row)
         
         pyxel.init(WIN_WIDTH, WIN_HEIGHT, title="Grid Maddness")
         pyxel.run(self.update, self.draw)
@@ -65,8 +89,9 @@ class App:
         center_x = WIN_WIDTH // 2
         center_y = WIN_HEIGHT // 2
         
-        # タイルの高さを取得
-        height = self.tile_heights[grid_y][grid_x]
+        # タイルオブジェクトから高さを取得
+        tile = self.tiles[grid_y][grid_x]
+        height = tile.height
         
         # 地面レベル（基準面）の座標計算
         # 横方向の間隔: CELL_SIZE//2 (15px間隔でタイルを配置)

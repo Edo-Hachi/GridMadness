@@ -6,4 +6,4 @@
 .vscode\launch.json
 .vscode\settings.json
 
-
+commit.txtの出力を依頼された時は、 git commit で使うので、UTF8 のベタテキストにしてください。

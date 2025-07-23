@@ -1,7 +1,8 @@
 import pyxel
 import math
 import random
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, asdict
 
 # タイルデータ構造
 @dataclass
@@ -18,7 +19,9 @@ class MapGrid:
     def __init__(self, map_size=256):
         self.map_size = map_size
         self.tiles = []
-        self.generate_random_map()
+        # 初期化時のランダム生成をコメントアウト（F2で読み込み、または手動生成）
+        # self.generate_random_map()
+        self.create_empty_map()
     
     def generate_random_map(self):
         """ランダムなマップデータを生成する"""
@@ -58,6 +61,32 @@ class MapGrid:
         
         print(f"256x256マップ生成完了！")
     
+    def create_empty_map(self):
+        """空のマップ（全て基本地形）を生成する"""
+        print(f"空の{self.map_size}x{self.map_size}マップを初期化中...")
+        
+        for y in range(self.map_size):
+            row = []
+            for x in range(self.map_size):
+                # floor_idを座標ベースで生成（xxx_yyy形式）
+                floor_id = f"{x:03d}_{y:03d}"
+                
+                # 基本設定（平坦な草地）
+                height = 1          # 最低高さ
+                attribute = 1       # 草地属性
+                color = 11          # 明緑色
+                
+                tile = Tile(
+                    floor_id=floor_id,
+                    height=height,
+                    attribute=attribute,
+                    color=color
+                )
+                row.append(tile)
+            self.tiles.append(row)
+        
+        print(f"空のマップ初期化完了！")
+    
     def get_tile(self, x, y):
         """指定座標のタイルを取得（範囲外チェック付き）"""
         if 0 <= x < self.map_size and 0 <= y < self.map_size:
@@ -84,6 +113,73 @@ class MapGrid:
                 row.append(tile)
             viewport.append(row)
         return viewport
+    
+    def save_to_json(self, filename="map_data.json"):
+        """マップデータをJSONファイルに保存"""
+        print(f"マップデータを{filename}に保存中...")
+        
+        # タイルデータを辞書形式に変換
+        map_data = {
+            "map_size": self.map_size,
+            "tiles": []
+        }
+        
+        for y in range(self.map_size):
+            row = []
+            for x in range(self.map_size):
+                tile = self.tiles[y][x]
+                tile_dict = asdict(tile)
+                row.append(tile_dict)
+            map_data["tiles"].append(row)
+        
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(map_data, f, ensure_ascii=False, indent=2)
+            print(f"保存完了: {filename}")
+            return True
+        except Exception as e:
+            print(f"保存エラー: {e}")
+            return False
+    
+    def load_from_json(self, filename="map_data.json"):
+        """JSONファイルからマップデータを読み込み"""
+        print(f"{filename}からマップデータを読み込み中...")
+        
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                map_data = json.load(f)
+            
+            # マップサイズの確認
+            if map_data["map_size"] != self.map_size:
+                print(f"警告: ファイルのマップサイズ({map_data['map_size']})が異なります")
+                return False
+            
+            # タイルデータを復元
+            new_tiles = []
+            for y in range(self.map_size):
+                row = []
+                for x in range(self.map_size):
+                    tile_dict = map_data["tiles"][y][x]
+                    tile = Tile(
+                        floor_id=tile_dict["floor_id"],
+                        height=tile_dict["height"],
+                        attribute=tile_dict["attribute"],
+                        color=tile_dict["color"]
+                    )
+                    row.append(tile)
+                new_tiles.append(row)
+            
+            # 既存のタイルデータを置き換え
+            self.tiles = new_tiles
+            print(f"読み込み完了: {filename}")
+            return True
+            
+        except FileNotFoundError:
+            print(f"ファイルが見つかりません: {filename}")
+            return False
+        except Exception as e:
+            print(f"読み込みエラー: {e}")
+            return False
 
 # 定数設定
 WIN_WIDTH = 256
@@ -128,6 +224,10 @@ class App:
         self.mouse_y = 0
         self.hovered_tile = None  # マウスオーバー中のタイル
         self.selected_tile = None  # 選択されたタイル
+        
+        # JSON操作のフィードバック
+        self.last_save_load_message = ""
+        self.message_timer = 0
         
         # 256x256のマップグリッドを生成
         print("MapGridを初期化中...")
@@ -321,6 +421,32 @@ class App:
         if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
             if self.hovered_tile:
                 self.selected_tile = self.hovered_tile
+        
+        # JSON保存/読み込み機能
+        if pyxel.btnp(pyxel.KEY_F1):  # F1キーで保存
+            if self.map_grid.save_to_json():
+                self.last_save_load_message = "Map Saved!"
+                self.message_timer = 120  # 2秒間表示（60FPS想定）
+        
+        if pyxel.btnp(pyxel.KEY_F2):  # F2キーで読み込み
+            if self.map_grid.load_from_json():
+                # 読み込み成功時、ビューポートを更新
+                self.update_viewport_tiles()
+                self.last_save_load_message = "Map Loaded!"
+                self.message_timer = 120  # 2秒間表示
+            else:
+                self.last_save_load_message = "Load Failed!"
+                self.message_timer = 120
+        
+        if pyxel.btnp(pyxel.KEY_F3):  # F3キーでランダムマップ生成
+            self.map_grid.generate_random_map()
+            self.update_viewport_tiles()
+            self.last_save_load_message = "Random Map Generated!"
+            self.message_timer = 120
+        
+        # メッセージタイマーを更新
+        if self.message_timer > 0:
+            self.message_timer -= 1
 
     def rect_poly(self, p0, p1, p2, p3, color):
         """4頂点の平行四辺形を2つの三角形で塗りつぶす"""
@@ -430,8 +556,10 @@ class App:
         pyxel.text(5, 21, "Q/E: Rotate view", 7)
         pyxel.text(5, 29, "Z/X/Wheel: Zoom", 7)
         pyxel.text(5, 37, "Mouse: Hover/Click", 7)
-        pyxel.text(5, 45, "C: Reset view", 7)
-        pyxel.text(5, 53, "ESC: Quit", 7)
+        pyxel.text(5, 45, "F1: Save / F2: Load", 7)
+        pyxel.text(5, 53, "F3: Random Map", 7)
+        pyxel.text(5, 61, "C: Reset view", 7)
+        pyxel.text(5, 69, "ESC: Quit", 7)
         
         # ステータス表示
         pyxel.text(5, 195, f"Rotation:{self.current_angle}deg", 7)
@@ -460,5 +588,14 @@ class App:
             # 選択タイルがない場合のみリセットヒントを表示
             if not self.selected_tile:
                 pyxel.text(5, 245, "Press C to reset!", 8)  # オレンジ色で目立つように
+        
+        # JSON操作のフィードバックメッセージ表示
+        if self.message_timer > 0:
+            # 画面中央にメッセージを表示
+            message_x = WIN_WIDTH // 2 - len(self.last_save_load_message) * 2
+            message_y = WIN_HEIGHT // 2 - 10
+            pyxel.rect(message_x - 4, message_y - 2, len(self.last_save_load_message) * 4 + 8, 12, 0)  # 背景
+            pyxel.rectb(message_x - 4, message_y - 2, len(self.last_save_load_message) * 4 + 8, 12, 7)  # 枠
+            pyxel.text(message_x, message_y, self.last_save_load_message, 10)  # 緑色で表示
 
 App()

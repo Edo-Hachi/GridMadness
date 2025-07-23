@@ -281,6 +281,17 @@ class App:
             if self.zoom < 0.3:  # 最小0.3倍まで
                 self.zoom = 0.3
         
+        # マウスホイールズーム
+        wheel_y = pyxel.mouse_wheel
+        if wheel_y > 0:  # ホイール前方向（上）= ズームイン
+            self.zoom += 0.1
+            if self.zoom > 3.0:
+                self.zoom = 3.0
+        elif wheel_y < 0:  # ホイール後方向（下）= ズームアウト
+            self.zoom -= 0.1
+            if self.zoom < 0.3:
+                self.zoom = 0.3
+        
         # リセット処理（Cキー）
         if pyxel.btnp(pyxel.KEY_C):
             # ビューポートを中央に戻す
@@ -417,7 +428,7 @@ class App:
         pyxel.text(5, 5, "WASD: Move viewport", 7)
         pyxel.text(5, 13, "Arrow: Move camera", 7)
         pyxel.text(5, 21, "Q/E: Rotate view", 7)
-        pyxel.text(5, 29, "Z/X: Zoom in/out", 7)
+        pyxel.text(5, 29, "Z/X/Wheel: Zoom", 7)
         pyxel.text(5, 37, "Mouse: Hover/Click", 7)
         pyxel.text(5, 45, "C: Reset view", 7)
         pyxel.text(5, 53, "ESC: Quit", 7)

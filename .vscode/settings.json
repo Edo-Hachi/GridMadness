@@ -1,16 +1,16 @@
 //For Ubuntu
-{
- "python.pythonPath": "../venv/bin/python"
-}
+// {
+//  "python.pythonPath": "../venv/bin/python"
+// }
 
 //For Windows
-// {
-//     "python.defaultInterpreterPath": "python.exe",
-//     "python.terminal.activateEnvironment": false,
-//     "files.encoding": "utf8",
-//     "files.eol": "\n",
-//     "python.linting.enabled": true,
-//     "python.linting.pylintEnabled": false,
-//     "python.linting.flake8Enabled": true,
-//     "python.formatting.provider": "black"
-// }
+{
+    "python.defaultInterpreterPath": "python.exe",
+    "python.terminal.activateEnvironment": false,
+    "files.encoding": "utf8",
+    "files.eol": "\n",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "black"
+}

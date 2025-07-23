@@ -31,7 +31,7 @@ class App:
             [1, 2, 1]   # 下段: 低-高-低
         ]
         
-        pyxel.init(WIN_WIDTH, WIN_HEIGHT, title="Isometric Floor")
+        pyxel.init(WIN_WIDTH, WIN_HEIGHT, title="Grid Maddness")
         pyxel.run(self.update, self.draw)
 
     def update(self):

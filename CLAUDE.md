@@ -14,17 +14,26 @@ The application uses Python 3.12.3 with pyxel 2.4.3 for game development.
 
 ## Project Architecture
 
-This is a Python-based isometric grid game built with the pyxel library. The project consists of:
+This is a Python-based isometric grid game built with the pyxel library. Currently in development phase with basic functionality implemented.
 
 ### Core Components
 
-- **main.py**: Main application entry point containing the `App` class
-  - Handles pyxel initialization and main game loop (update/draw)
-  - Manages camera controls (arrow keys for scrolling, Z/X for zoom, Q/W for rotation, A for reset)
-  - Handles mouse interactions for tile selection and hover effects
-  - Renders the isometric grid with proper depth sorting and 3D rotation
+- **main.py**: Basic isometric tile renderer (current implementation)
+  - Simple `App` class with pyxel initialization and main game loop
+  - Basic camera controls (arrow keys for scrolling only)
+  - Fixed 3x3 grid with hardcoded height values (1-3 range)
+  - Isometric diamond tile rendering with 3D appearance (top, left, right faces)
+  - No rotation, zoom, or mouse interaction yet
 
-- **FieldGrid.py**: Grid data structure and tile management
+- **main_backup.py**: Full-featured version with advanced capabilities
+  - Complete 3D rotation system with 15-degree increments (24 directions)
+  - Dynamic Z-sorting and proper depth rendering
+  - Mouse-based tile selection with hover/click effects
+  - Camera controls including zoom (0.3x-3.0x) and rotation
+  - Integration with FieldGrid for dynamic tile management
+  - Compass direction labels with rotation-aware positioning
+
+- **FieldGrid.py**: Grid data structure and tile management (used by main_backup.py)
   - `Tile` dataclass: Stores tile properties (height, ground_type, level, position, center coordinates)
   - `FieldGrid` class: Manages 2D array of tiles with random generation
   - Ground types: "fire", "water", "earth", "wind"
@@ -32,46 +41,53 @@ This is a Python-based isometric grid game built with the pyxel library. The pro
 
 - **my_resource.pyxres**: Pyxel resource file containing game assets (images, sounds, maps)
 
-### Key Features
+### Current Status (main.py)
 
-- **3D Rotation System**: 15-degree incremental rotation (24 directions)
-- **Dynamic Z-Sorting**: Proper depth rendering for all rotation angles
-- **Isometric 3D Projection**: 10x10 grid with height-based 3D appearance
-- **Interactive Camera System**: Scroll, zoom, and rotation controls
-- **Mouse-based Tile Selection**: Hover highlighting and click selection
-- **Collision Detection**: Center rectangle method for tile selection
-- **Real-time Updates**: Configurable height animation system
+**Implemented Features:**
+- **Basic Isometric Rendering**: Diamond-shaped tiles with 3D appearance
+- **Simple Camera System**: Arrow key scrolling only
+- **Fixed Grid**: 3x3 hardcoded height map
+- **3D Tile Appearance**: Left/right side faces with proper shading
 
-### Coordinate System
+**Missing Features (available in main_backup.py):**
+- 3D rotation system
+- Mouse interaction and tile selection
+- Zoom functionality
+- Dynamic grid management
+- Z-sorting for proper depth rendering
+- Compass direction system
 
-The application uses a multi-stage coordinate transformation:
-1. **Grid Coordinates**: Base (x, y) positions in the 10x10 grid
-2. **Rotation Transform**: 3D rotation matrix applied around grid center
-3. **Isometric Projection**: Converted to isometric screen coordinates
-4. **Camera Transform**: Zoom and offset applied for viewport control
-5. **Z-Sorting**: Dynamic depth calculation for proper rendering order
+### Key Constants
 
-Key transformation functions:
-- `get_rotated_coordinates(x, y)`: Applies rotation matrix
-- `get_tile_depth(x, y)`: Calculates rendering depth for Z-sorting
+```python
+WIN_WIDTH = 256          # Window width
+WIN_HEIGHT = 256         # Window height  
+GRID_SIZE = 3           # Current: 3x3 grid (main_backup.py uses 10x10)
+CELL_SIZE = 30          # Diamond tile width (30px horizontal, 15px vertical)
+HEIGHT_UNIT = 5         # Vertical pixels per height level
+```
 
-### Controls
+### Coordinate System (Current)
+
+Basic 2D isometric projection:
+```python
+iso_x = (grid_x - grid_y) * (CELL_SIZE // 2) + center_x + offset_x
+iso_y = (grid_x + grid_y) * (CELL_SIZE // 4) + center_y + offset_y - height * HEIGHT_UNIT
+```
+
+### Controls (Current)
 
 - **Arrow keys**: Camera movement (scroll)
-- **Z/X keys**: Zoom in/out (0.3x to 3.0x)
-- **Q/W keys**: Rotate view (15-degree steps, 24 directions)
-- **A key**: Reset camera position and rotation
-- **Mouse**: Hover and click to select tiles
-- **Escape**: Quit application
+- **Q key**: Quit application
 
-### Rotation System
+### Advanced Features (main_backup.py)
 
-The rotation system supports:
-- **24 discrete directions** (15-degree increments)
-- **Configurable step size** (easily adjustable from 15° to 30°, 10°, etc.)
-- **Smooth visual transitions** between rotation states
-- **Proper Z-sorting** for all rotation angles
-- **Performance optimized** with pre-calculated depth values
+The backup version contains the full feature set described in the original documentation:
+- **3D Rotation System**: 15-degree incremental rotation (24 directions)
+- **Dynamic Z-Sorting**: Proper depth rendering for all rotation angles
+- **Mouse-based Tile Selection**: Hover highlighting and click selection
+- **Advanced Camera**: Scroll, zoom (Z/X keys), rotation (Q/W keys), reset (A key)
+- **Real-time Updates**: Configurable height animation system
 
 ### Development Environment
 
@@ -79,27 +95,34 @@ The rotation system supports:
 - **Dependencies**: pyxel 2.4.3 for game development
 - **Language**: Mixed Japanese/English (comments and README in Japanese)
 - **Version Control**: Git-based with incremental feature commits
-- **Architecture**: Modular design with clear separation of concerns
+- **Architecture**: Currently refactoring from main_backup.py to main.py
 
 ### File Structure
 
 ```
 GridMadness/
-├── main.py                    # Main application with rotation system
+├── main.py                    # Current: Basic isometric renderer (3x3 grid)
+├── main_backup.py            # Full-featured version with rotation system
 ├── FieldGrid.py              # Grid data structures and tile management
 ├── my_resource.pyxres         # Pyxel game assets
-├── main_before_rotation.py    # Backup before rotation system
-├── main_baclup.py            # Earlier development backup
 ├── README.md                 # Project documentation (Japanese)
 ├── CLAUDE.md                 # Development guidance (this file)
 └── venv/                     # Python virtual environment
 ```
 
+### Development Status
+
+**Current Phase**: Rebuilding main.py from scratch based on main_backup.py reference
+- Starting with basic 3x3 isometric grid
+- Implementing fundamental rendering before adding advanced features
+- main_backup.py serves as reference for full feature implementation
+
 ### Extension Points
 
 The system is designed for easy extension:
-- **Rotation angles**: Modify `self.rotation_step` (15°, 10°, 5°, etc.)
-- **Grid size**: Adjust `GRID_SIZE` constant
-- **Tile properties**: Extend `Tile` dataclass in FieldGrid.py
-- **Visual effects**: Add new rendering methods in main.py
-- **Input handling**: Extend key/mouse processing in update() method
+- **Grid size**: Adjust `GRID_SIZE` constant (currently 3, can expand to 10x10)
+- **Tile rendering**: Extend `draw_diamond_tile()` method
+- **Camera system**: Add zoom and rotation from main_backup.py
+- **Mouse interaction**: Implement tile selection and hover effects
+- **Dynamic tiles**: Integrate FieldGrid.py for random generation
+- **Visual effects**: Add new rendering methods based on main_backup.py patterns

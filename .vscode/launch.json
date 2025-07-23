@@ -1,33 +1,33 @@
 
 //For Windows
-// {
-//     "version": "0.2.0",
-//     "configurations": [
-
-//         {
-//             "name": "Python デバッガー: main.py",
-//             "type": "debugpy",
-//             "request": "launch",
-// //            "program": "${workspaceFolder}/homing.py",
-//             "program": "${workspaceFolder}/main.py",
-// //            "program": "${workspaceFolder}/SpriteDefiner.py",
-//             "console": "integratedTerminal"
-//         }
-//     ]
-// }
-
-// For Ubuntu 
 {
     "version": "0.2.0",
     "configurations": [
+
         {
-            "name": "Python デバッガー: 現在のファイル",
+            "name": "Python デバッガー: main.py",
             "type": "debugpy",
             "request": "launch",
+//            "program": "${workspaceFolder}/homing.py",
             "program": "${workspaceFolder}/main.py",
 //            "program": "${workspaceFolder}/SpriteDefiner.py",
-            "console": "integratedTerminal",
-            "python": "${workspaceFolder}/../venv/bin/python",            
+            "console": "integratedTerminal"
         }
     ]
 }
+
+// For Ubuntu 
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "Python デバッガー: 現在のファイル",
+//             "type": "debugpy",
+//             "request": "launch",
+//             "program": "${workspaceFolder}/main.py",
+// //            "program": "${workspaceFolder}/SpriteDefiner.py",
+//             "console": "integratedTerminal",
+//             "python": "${workspaceFolder}/../venv/bin/python",            
+//         }
+//     ]
+// }

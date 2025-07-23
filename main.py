@@ -150,6 +150,15 @@ class App:
         rotated_y = rel_x * math.sin(angle_rad) + rel_y * math.cos(angle_rad)
         
         return rotated_x, rotated_y
+    
+    def get_tile_depth(self, grid_x, grid_y):
+        """Z-ソート用にタイルの描画順を決めるための深度値を計算する"""
+        rotated_x, rotated_y = self.get_rotated_coordinates(grid_x, grid_y)
+        tile = self.current_tiles[grid_y][grid_x]
+        
+        # 深度 = 回転後のY座標 + 高さ（後ろにあるものほど先に描画）
+        depth = rotated_y - tile.height * 0.1
+        return depth
 
     def update(self):
         if pyxel.btnp(pyxel.KEY_ESCAPE):
@@ -273,10 +282,20 @@ class App:
     def draw(self):
         pyxel.cls(0)
         
-        # 16x16ビューポートのダイアモンドタイルを描画
+        # Z-ソート: 深度順にタイルを並べる
+        # 各タイルの描画深度を求め配列に格納
+        tiles_with_depth = []
         for y in range(self.viewport_size):
             for x in range(self.viewport_size):
-                self.draw_diamond_tile(x, y)
+                depth = self.get_tile_depth(x, y)
+                tiles_with_depth.append((depth, x, y))
+        
+        # 深度順にソート（小さい値から大きい値へ = 奥から手前へ）
+        tiles_with_depth.sort(key=lambda item: item[0])
+        
+        # ソート済みの順序で描画（奥から手前の順にタイルを描画）
+        for depth, x, y in tiles_with_depth:
+            self.draw_diamond_tile(x, y)
         
         # ビューポート情報とタイル色表示を追加
         tile_center = self.current_tiles[8][8]  # 中央タイル
@@ -290,9 +309,13 @@ class App:
         pyxel.text(5, 37, "ESC: Quit", 7)
         
         # ステータス表示
-        pyxel.text(5, 215, f"Rotation:{self.current_angle}deg", 7)
-        pyxel.text(5, 225, f"Zoom:{self.zoom:.1f}x", 7)
-        pyxel.text(5, 235, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
-        pyxel.text(5, 245, f"Tile:{tile_center.floor_id}", 7)
+        pyxel.text(5, 205, f"Rotation:{self.current_angle}deg", 7)
+        pyxel.text(5, 215, f"Zoom:{self.zoom:.1f}x", 7)
+        pyxel.text(5, 225, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
+        pyxel.text(5, 235, f"Tile:{tile_center.floor_id}", 7)
+        
+        # デバッグ情報：中央タイルの深度値
+        center_depth = self.get_tile_depth(8, 8)
+        pyxel.text(5, 245, f"Depth:{center_depth:.2f}", 7)
 
 App()

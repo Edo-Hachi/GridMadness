@@ -123,6 +123,12 @@ class App:
         self.initial_zoom = self.zoom
         self.initial_rotation_index = self.rotation_index
         
+        # マウス座標や選択状態
+        self.mouse_x = 0
+        self.mouse_y = 0
+        self.hovered_tile = None  # マウスオーバー中のタイル
+        self.selected_tile = None  # 選択されたタイル
+        
         # 256x256のマップグリッドを生成
         print("MapGridを初期化中...")
         self.map_grid = MapGrid(256)
@@ -131,6 +137,7 @@ class App:
         self.update_viewport_tiles()
         
         pyxel.init(WIN_WIDTH, WIN_HEIGHT, title="Grid Maddness")
+        pyxel.mouse(True)  # マウスカーソルを表示
         pyxel.run(self.update, self.draw)
     
     def update_viewport_tiles(self):
@@ -167,10 +174,72 @@ class App:
         # 深度 = 回転後のY座標 + 高さ（後ろにあるものほど先に描画）
         depth = rotated_y - tile.height * 0.1
         return depth
+    
+    def is_point_in_center_rect(self, point_x, point_y, diamond_center_x, diamond_center_y, diamond_width, diamond_height):
+        """中央の矩形を用いたシンプルな当たり判定を行う"""
+        # 矩形のサイズ（ひし形の幅・高さの50%を中央に）
+        rect_width = diamond_width * 0.5
+        rect_height = diamond_height * 0.5
+        left = diamond_center_x - rect_width / 2
+        right = diamond_center_x + rect_width / 2
+        top = diamond_center_y - rect_height / 2
+        bottom = diamond_center_y + rect_height / 2
+        return left <= point_x <= right and top <= point_y <= bottom
+    
+    def get_tile_at_mouse(self):
+        """マウスカーソル下にあるタイルを返す"""
+        center_x = WIN_WIDTH // 2
+        center_y = WIN_HEIGHT // 2
+
+        # 全タイルを走査してマウス座標との当たりを検出
+        for y in range(self.viewport_size):
+            for x in range(self.viewport_size):
+                tile = self.current_tiles[y][x]
+                height = tile.height
+                
+                # 回転座標を取得
+                rotated_x, rotated_y = self.get_rotated_coordinates(x, y)
+                
+                # draw_diamond_tileと同じ座標計算を使用
+                base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
+                base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset - height * HEIGHT_UNIT
+                
+                # ズーム適用（ウィンドウ中心を基準）
+                iso_x = center_x + (base_iso_x - center_x) * self.zoom
+                iso_y = center_y + (base_iso_y - center_y) * self.zoom
+                
+                # ズーム適用されたセルサイズ
+                scaled_cell_size = int(CELL_SIZE * self.zoom)
+                
+                # ダイアモンド（ひし形）上面の4頂点を計算（draw_diamond_tileと同じ）
+                FT = (iso_x + scaled_cell_size // 2, iso_y)                           # 上
+                FL = (iso_x, iso_y + scaled_cell_size // 4)                          # 左
+                FR = (iso_x + scaled_cell_size, iso_y + scaled_cell_size // 4)       # 右
+                FB = (iso_x + scaled_cell_size // 2, iso_y + scaled_cell_size // 2)  # 下
+                
+                # ひし形の中心座標を正確に計算
+                diamond_center_x = (FL[0] + FR[0]) / 2  # 左右の中点
+                diamond_center_y = (FT[1] + FB[1]) / 2  # 上下の中点
+                
+                # ひし形のサイズ
+                diamond_width = scaled_cell_size
+                diamond_height = scaled_cell_size // 2
+                
+                # 中心矩形で当たり判定
+                if self.is_point_in_center_rect(self.mouse_x, self.mouse_y, 
+                                               diamond_center_x, diamond_center_y, 
+                                               diamond_width, diamond_height):
+                    return (x, y)
+        
+        return None
 
     def update(self):
         if pyxel.btnp(pyxel.KEY_ESCAPE):
             pyxel.quit()
+        
+        # 現在のマウス座標を取得
+        self.mouse_x = pyxel.mouse_x
+        self.mouse_y = pyxel.mouse_y
         
         # WASD移動でビューポートを移動（256x256マップ内）
         viewport_moved = False
@@ -236,6 +305,11 @@ class App:
             self.iso_y_offset -= 2
         if pyxel.btn(pyxel.KEY_DOWN):
             self.iso_y_offset += 2
+        
+        # マウスクリックでタイル選択
+        if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+            if self.hovered_tile:
+                self.selected_tile = self.hovered_tile
 
     def rect_poly(self, p0, p1, p2, p3, color):
         """4頂点の平行四辺形を2つの三角形で塗りつぶす"""
@@ -296,14 +370,29 @@ class App:
         # FB(下上) -> FR(右上) -> BR(右下) -> BB(下下) の順で平行四辺形
         self.rect_poly(FB, FR, BR, BB, COLOR_RIGHT)
         
-        # 上面（ひし形）を描画（タイルの色を使用）
-        self.rect_poly(FL, FT, FR, FB, tile.color)
+        # 色の決定（ホバー/選択状態を考慮）
+        top_color = tile.color
+        
+        # マウスオーバーまたは選択状態の場合は色を変更
+        is_hovered = self.hovered_tile == (grid_x, grid_y)
+        is_selected = self.selected_tile == (grid_x, grid_y)
+        
+        if is_selected:
+            top_color = 9  # 青色（選択状態）
+        elif is_hovered:
+            top_color = 10  # 緑色（ホバー状態）
+        
+        # 上面（ひし形）を描画
+        self.rect_poly(FL, FT, FR, FB, top_color)
         
         # 上面の枠線を描画
         self.rect_polyb(FT, FL, FB, FR, COLOR_OUTLINE)
 
     def draw(self):
         pyxel.cls(0)
+        
+        # マウスオーバー中のタイルを更新
+        self.hovered_tile = self.get_tile_at_mouse()
         
         # Z-ソート: 深度順にタイルを並べる
         # 各タイルの描画深度を求め配列に格納
@@ -329,8 +418,9 @@ class App:
         pyxel.text(5, 13, "Arrow: Move camera", 7)
         pyxel.text(5, 21, "Q/E: Rotate view", 7)
         pyxel.text(5, 29, "Z/X: Zoom in/out", 7)
-        pyxel.text(5, 37, "C: Reset view", 7)
-        pyxel.text(5, 45, "ESC: Quit", 7)
+        pyxel.text(5, 37, "Mouse: Hover/Click", 7)
+        pyxel.text(5, 45, "C: Reset view", 7)
+        pyxel.text(5, 53, "ESC: Quit", 7)
         
         # ステータス表示
         pyxel.text(5, 195, f"Rotation:{self.current_angle}deg", 7)
@@ -338,9 +428,16 @@ class App:
         pyxel.text(5, 215, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
         pyxel.text(5, 225, f"Tile:{tile_center.floor_id}", 7)
         
-        # デバッグ情報：中央タイルの深度値
-        center_depth = self.get_tile_depth(8, 8)
-        pyxel.text(5, 235, f"Depth:{center_depth:.2f}", 7)
+        # ホバー/選択タイル情報を表示
+        if self.hovered_tile:
+            x, y = self.hovered_tile
+            tile = self.current_tiles[y][x]
+            pyxel.text(5, 235, f"Hover:({x},{y}) H:{tile.height}", 7)
+        
+        if self.selected_tile:
+            x, y = self.selected_tile
+            tile = self.current_tiles[y][x]
+            pyxel.text(5, 245, f"Select:({x},{y}) {tile.floor_id}", 9)
         
         # リセット可能であることを示すヒント
         if self.viewport_x != self.initial_viewport_x or \
@@ -349,6 +446,8 @@ class App:
            self.iso_y_offset != self.initial_iso_y_offset or \
            self.zoom != self.initial_zoom or \
            self.rotation_index != self.initial_rotation_index:
-            pyxel.text(5, 245, "Press C to reset!", 8)  # オレンジ色で目立つように
+            # 選択タイルがない場合のみリセットヒントを表示
+            if not self.selected_tile:
+                pyxel.text(5, 245, "Press C to reset!", 8)  # オレンジ色で目立つように
 
 App()

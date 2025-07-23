@@ -112,17 +112,42 @@ GridMadness/
 
 ### Development Status
 
-**Current Phase**: Rebuilding main.py from scratch based on main_backup.py reference
-- Starting with basic 3x3 isometric grid
-- Implementing fundamental rendering before adding advanced features
-- main_backup.py serves as reference for full feature implementation
+**Current Phase**: Advanced isometric system implementation completed
+- ✅ 256x256 MapGrid with 16x16 viewport system
+- ✅ 3D rotation system (Q/E keys, 15-degree steps)
+- ✅ Zoom functionality (Z/X keys, 0.3x-3.0x range)
+- ✅ Z-sorting for proper depth rendering
+- ✅ Mouse interaction with hover/click selection
+- ✅ Camera reset functionality (C key)
+
+**Current Implementation Features:**
+- **WASD**: Viewport navigation through 256x256 map
+- **Q/E**: 3D rotation (24 directions)
+- **Z/X**: Zoom in/out
+- **Mouse**: Hover (green) and click selection (blue)
+- **C**: Reset all camera settings
+- **Arrow keys**: Fine camera adjustment
+- **ESCAPE**: Quit application
+
+### Known Issues
+
+**Mouse Collision Detection**:
+- マウスクリック当たり判定が時々ずれる問題が確認されている
+- `get_tile_at_mouse()`メソッドの座標計算が`draw_diamond_tile()`と完全に一致していない可能性
+- 特に回転・ズーム時に発生しやすい
+- 今後のデバッグ課題として記録
+
+**Technical Details**:
+- 中央矩形法による当たり判定を使用中
+- ひし形の実際の形状ではなく、中央の矩形エリアで判定
+- より精密なひし形当たり判定への改善が必要
 
 ### Extension Points
 
 The system is designed for easy extension:
-- **Grid size**: Adjust `GRID_SIZE` constant (currently 3, can expand to 10x10)
-- **Tile rendering**: Extend `draw_diamond_tile()` method
-- **Camera system**: Add zoom and rotation from main_backup.py
-- **Mouse interaction**: Implement tile selection and hover effects
-- **Dynamic tiles**: Integrate FieldGrid.py for random generation
-- **Visual effects**: Add new rendering methods based on main_backup.py patterns
+- **Mouse wheel zoom**: Add wheel support for zoom control
+- **JSON save/load**: Map data persistence
+- **More precise collision**: Improve diamond-shaped hit detection
+- **Visual effects**: Add particle effects or animations
+- **Terrain editing**: Interactive map modification tools
+- **Multi-layer support**: Height-based layer system

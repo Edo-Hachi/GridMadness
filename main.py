@@ -115,6 +115,14 @@ class App:
         self.rotation_index = 0  # 現在の回転ステップ番号
         self.max_rotations = 360 // self.rotation_step  # 24方向
         
+        # 初期値の保存（Aキーでリセットするため）
+        self.initial_viewport_x = self.viewport_x
+        self.initial_viewport_y = self.viewport_y
+        self.initial_iso_x_offset = self.iso_x_offset
+        self.initial_iso_y_offset = self.iso_y_offset
+        self.initial_zoom = self.zoom
+        self.initial_rotation_index = self.rotation_index
+        
         # 256x256のマップグリッドを生成
         print("MapGridを初期化中...")
         self.map_grid = MapGrid(256)
@@ -203,6 +211,21 @@ class App:
             self.zoom -= 0.05  # 少しずつズームアウト
             if self.zoom < 0.3:  # 最小0.3倍まで
                 self.zoom = 0.3
+        
+        # リセット処理（Cキー）
+        if pyxel.btnp(pyxel.KEY_C):
+            # ビューポートを中央に戻す
+            self.viewport_x = self.initial_viewport_x
+            self.viewport_y = self.initial_viewport_y
+            # カメラオフセットをリセット
+            self.iso_x_offset = self.initial_iso_x_offset
+            self.iso_y_offset = self.initial_iso_y_offset
+            # ズームをリセット
+            self.zoom = self.initial_zoom
+            # 回転をリセット
+            self.rotation_index = self.initial_rotation_index
+            # ビューポートタイルを更新
+            self.update_viewport_tiles()
         
         # 矢印キーでカメラ移動（表示位置の微調整）
         if pyxel.btn(pyxel.KEY_LEFT):
@@ -306,16 +329,26 @@ class App:
         pyxel.text(5, 13, "Arrow: Move camera", 7)
         pyxel.text(5, 21, "Q/E: Rotate view", 7)
         pyxel.text(5, 29, "Z/X: Zoom in/out", 7)
-        pyxel.text(5, 37, "ESC: Quit", 7)
+        pyxel.text(5, 37, "C: Reset view", 7)
+        pyxel.text(5, 45, "ESC: Quit", 7)
         
         # ステータス表示
-        pyxel.text(5, 205, f"Rotation:{self.current_angle}deg", 7)
-        pyxel.text(5, 215, f"Zoom:{self.zoom:.1f}x", 7)
-        pyxel.text(5, 225, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
-        pyxel.text(5, 235, f"Tile:{tile_center.floor_id}", 7)
+        pyxel.text(5, 195, f"Rotation:{self.current_angle}deg", 7)
+        pyxel.text(5, 205, f"Zoom:{self.zoom:.1f}x", 7)
+        pyxel.text(5, 215, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
+        pyxel.text(5, 225, f"Tile:{tile_center.floor_id}", 7)
         
         # デバッグ情報：中央タイルの深度値
         center_depth = self.get_tile_depth(8, 8)
-        pyxel.text(5, 245, f"Depth:{center_depth:.2f}", 7)
+        pyxel.text(5, 235, f"Depth:{center_depth:.2f}", 7)
+        
+        # リセット可能であることを示すヒント
+        if self.viewport_x != self.initial_viewport_x or \
+           self.viewport_y != self.initial_viewport_y or \
+           self.iso_x_offset != self.initial_iso_x_offset or \
+           self.iso_y_offset != self.initial_iso_y_offset or \
+           self.zoom != self.initial_zoom or \
+           self.rotation_index != self.initial_rotation_index:
+            pyxel.text(5, 245, "Press C to reset!", 8)  # オレンジ色で目立つように
 
 App()

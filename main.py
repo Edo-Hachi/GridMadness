@@ -110,6 +110,11 @@ class App:
         self.viewport_y = 120  # マップ中央付近から開始
         self.viewport_size = VIEWPORT_SIZE  # 16x16を表示
         
+        # 回転システム
+        self.rotation_step = 15  # 15度刻み
+        self.rotation_index = 0  # 現在の回転ステップ番号
+        self.max_rotations = 360 // self.rotation_step  # 24方向
+        
         # 256x256のマップグリッドを生成
         print("MapGridを初期化中...")
         self.map_grid = MapGrid(256)
@@ -125,9 +130,29 @@ class App:
         self.current_tiles = self.map_grid.get_viewport_tiles(
             self.viewport_x, self.viewport_y, self.viewport_size
         )
+    
+    @property
+    def current_angle(self):
+        """現在の回転角度(度)を返す"""
+        return self.rotation_index * self.rotation_step
+    
+    def get_rotated_coordinates(self, grid_x, grid_y):
+        """現在の回転角度を用いてグリッド座標を回転させる"""
+        angle_rad = math.radians(self.current_angle)
+        
+        # グリッド中心からの相対座標
+        center = self.viewport_size // 2
+        rel_x = grid_x - center
+        rel_y = grid_y - center
+        
+        # 回転変換
+        rotated_x = rel_x * math.cos(angle_rad) - rel_y * math.sin(angle_rad)
+        rotated_y = rel_x * math.sin(angle_rad) + rel_y * math.cos(angle_rad)
+        
+        return rotated_x, rotated_y
 
     def update(self):
-        if pyxel.btnp(pyxel.KEY_Q):
+        if pyxel.btnp(pyxel.KEY_ESCAPE):
             pyxel.quit()
         
         # WASD移動でビューポートを移動（256x256マップ内）
@@ -153,6 +178,22 @@ class App:
         # ビューポートが移動した場合、表示タイルを更新
         if viewport_moved:
             self.update_viewport_tiles()
+        
+        # 回転処理（Q/Eキー）
+        if pyxel.btnp(pyxel.KEY_Q):  # 反時計回り
+            self.rotation_index = (self.rotation_index - 1) % self.max_rotations
+        if pyxel.btnp(pyxel.KEY_E):  # 時計回り（Wの代わりにE）
+            self.rotation_index = (self.rotation_index + 1) % self.max_rotations
+        
+        # ズーム機能（Z/Xキー）
+        if pyxel.btn(pyxel.KEY_Z):
+            self.zoom += 0.05  # 少しずつズーム
+            if self.zoom > 3.0:  # 最大3倍まで
+                self.zoom = 3.0
+        if pyxel.btn(pyxel.KEY_X):
+            self.zoom -= 0.05  # 少しずつズームアウト
+            if self.zoom < 0.3:  # 最小0.3倍まで
+                self.zoom = 0.3
         
         # 矢印キーでカメラ移動（表示位置の微調整）
         if pyxel.btn(pyxel.KEY_LEFT):
@@ -185,29 +226,35 @@ class App:
         tile = self.current_tiles[grid_y][grid_x]
         height = tile.height
         
-        # 地面レベル（基準面）の座標計算
-        # 横方向の間隔: CELL_SIZE//2 (15px間隔でタイルを配置)
-        # 縦方向の間隔: CELL_SIZE//4 (7.5px間隔でタイルを配置)
-        iso_x = (grid_x - grid_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
-        base_iso_y = (grid_x + grid_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset
+        # 回転座標を取得
+        rotated_x, rotated_y = self.get_rotated_coordinates(grid_x, grid_y)
         
-        # 上面の座標計算（地面レベルから高さ分だけ上に）
-        iso_y = base_iso_y - height * HEIGHT_UNIT
+        # 回転後のアイソメトリック座標計算
+        base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
+        base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset - height * HEIGHT_UNIT
+        
+        # ズーム適用（ウィンドウ中心を基準）
+        iso_x = center_x + (base_iso_x - center_x) * self.zoom
+        iso_y = center_y + (base_iso_y - center_y) * self.zoom
+        
+        # 地面レベル座標もズーム適用（回転座標使用）
+        base_ground_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset
+        ground_y = center_y + (base_ground_y - center_y) * self.zoom
+        
+        # ズーム適用されたセルサイズと高さ単位
+        scaled_cell_size = int(CELL_SIZE * self.zoom)
+        scaled_height_unit = int(HEIGHT_UNIT * self.zoom)
         
         # ダイアモンド（ひし形）上面の4頂点を計算
-        # CELL_SIZE=30の場合の座標オフセット:
-        # 上: 中心から右に15px, 下: 中心から右に15px・下に15px
-        # 左: 中心から下に7.5px, 右: 中心から右に30px・下に7.5px
-        FT = (iso_x + CELL_SIZE // 2, iso_y)                    # 上: +15px, +0px
-        FL = (iso_x, iso_y + CELL_SIZE // 4)                    # 左: +0px, +7.5px
-        FR = (iso_x + CELL_SIZE, iso_y + CELL_SIZE // 4)        # 右: +30px, +7.5px
-        FB = (iso_x + CELL_SIZE // 2, iso_y + CELL_SIZE // 2)   # 下: +15px, +15px
+        FT = (iso_x + scaled_cell_size // 2, iso_y)                           # 上
+        FL = (iso_x, iso_y + scaled_cell_size // 4)                          # 左
+        FR = (iso_x + scaled_cell_size, iso_y + scaled_cell_size // 4)       # 右
+        FB = (iso_x + scaled_cell_size // 2, iso_y + scaled_cell_size // 2)  # 下
         
         # 壁面（側面）の下側座標を地面レベル基準で計算
-        # 全タイルの底面が同じ地面レベルに揃うように統一
-        BL = (FL[0], base_iso_y + CELL_SIZE // 4)   # 左側面の下（地面レベル基準）
-        BR = (FR[0], base_iso_y + CELL_SIZE // 4)   # 右側面の下（地面レベル基準）
-        BB = (FB[0], base_iso_y + CELL_SIZE // 2)   # 下側面の下（地面レベル基準）
+        BL = (FL[0], ground_y + scaled_cell_size // 4)   # 左側面の下
+        BR = (FR[0], ground_y + scaled_cell_size // 4)   # 右側面の下
+        BB = (FB[0], ground_y + scaled_cell_size // 2)   # 下側面の下
         
         # 左側面を描画（ライトグレー）
         # FL(左上) -> FB(下上) -> BB(下下) -> BL(左下) の順で平行四辺形
@@ -238,7 +285,13 @@ class App:
         # 操作説明
         pyxel.text(5, 5, "WASD: Move viewport", 7)
         pyxel.text(5, 13, "Arrow: Move camera", 7)
-        pyxel.text(5, 21, "Q: Quit", 7)
+        pyxel.text(5, 21, "Q/E: Rotate view", 7)
+        pyxel.text(5, 29, "Z/X: Zoom in/out", 7)
+        pyxel.text(5, 37, "ESC: Quit", 7)
+        
+        # ステータス表示
+        pyxel.text(5, 215, f"Rotation:{self.current_angle}deg", 7)
+        pyxel.text(5, 225, f"Zoom:{self.zoom:.1f}x", 7)
         pyxel.text(5, 235, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
         pyxel.text(5, 245, f"Tile:{tile_center.floor_id}", 7)
 

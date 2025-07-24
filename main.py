@@ -4,6 +4,19 @@ import random
 import json
 from dataclasses import dataclass, asdict
 
+# 定数設定
+WIN_WIDTH = 256
+WIN_HEIGHT = 192
+VIEWPORT_SIZE = 16  # 16x16ビューポート
+CELL_SIZE = 16  # タイルサイズを小さく（16x16表示のため）
+HEIGHT_UNIT = 5  # 高さ単位（1段=5ピクセル）
+
+# 色定数
+COLOR_OUTLINE = pyxel.COLOR_WHITE
+COLOR_TOP = pyxel.COLOR_LIME
+COLOR_LEFT = pyxel.COLOR_GRAY   # 左側面（ライトグレー）
+COLOR_RIGHT = pyxel.COLOR_DARK_BLUE  # 右側面（ダークグレー）
+
 # タイルデータ構造
 @dataclass
 class Tile:
@@ -27,13 +40,16 @@ class MapGrid:
         """ランダムなマップデータを生成する"""
         print(f"256x256マップを生成中...")
         
+        # 既存のタイルデータをクリア
+        self.tiles = []
+        
         # 地形属性の定義
         terrain_types = [
-            {"attribute": 1, "color": 11, "name": "草地"},      # 明緑
-            {"attribute": 2, "color": 3, "name": "森"},         # 暗緑
-            {"attribute": 3, "color": 12, "name": "砂漠"},      # 黄色
-            {"attribute": 4, "color": 1, "name": "海"},         # 青
-            {"attribute": 5, "color": 8, "name": "山"},         # 赤
+            {"attribute": 1, "color": pyxel.COLOR_LIME, "name": "草地"},      # 明緑
+            {"attribute": 2, "color": pyxel.COLOR_GREEN, "name": "森"},         # 暗緑
+            {"attribute": 3, "color": pyxel.COLOR_YELLOW, "name": "砂漠"},      # 黄色
+            {"attribute": 4, "color": pyxel.COLOR_NAVY, "name": "海"},         # 青
+            {"attribute": 5, "color": pyxel.COLOR_RED, "name": "山"},         # 赤
         ]
         
         for y in range(self.map_size):
@@ -42,8 +58,8 @@ class MapGrid:
                 # floor_idを座標ベースで生成（xxx_yyy形式）
                 floor_id = f"{x:03d}_{y:03d}"
                 
-                # ランダムな高さ（1-15の範囲）
-                height = random.randint(1, 15)
+                # ランダムな高さ（1-5の範囲）
+                height = random.randint(1, 5)
                 
                 # ランダムな地形タイプを選択
                 terrain = random.choice(terrain_types)
@@ -74,7 +90,7 @@ class MapGrid:
                 # 基本設定（平坦な草地）
                 height = 1          # 最低高さ
                 attribute = 1       # 草地属性
-                color = 11          # 明緑色
+                color = pyxel.COLOR_LIME          # 明緑色
                 
                 tile = Tile(
                     floor_id=floor_id,
@@ -108,7 +124,7 @@ class MapGrid:
                         floor_id=f"{map_x:03d}_{map_y:03d}",
                         height=1,
                         attribute=0,
-                        color=0  # 黒
+                        color=pyxel.COLOR_BLACK  # 黒
                     )
                 row.append(tile)
             viewport.append(row)
@@ -168,7 +184,7 @@ class MapGrid:
                     )
                     row.append(tile)
                 new_tiles.append(row)
-            
+
             # 既存のタイルデータを置き換え
             self.tiles = new_tiles
             print(f"読み込み完了: {filename}")
@@ -181,18 +197,7 @@ class MapGrid:
             print(f"読み込みエラー: {e}")
             return False
 
-# 定数設定
-WIN_WIDTH = 256
-WIN_HEIGHT = 256
-VIEWPORT_SIZE = 16  # 16x16ビューポート
-CELL_SIZE = 16  # タイルサイズを小さく（16x16表示のため）
-HEIGHT_UNIT = 2  # 高さ単位を小さく（密集表示のため）
 
-# 色定数
-COLOR_OUTLINE = 7
-COLOR_TOP = 11
-COLOR_LEFT = 6   # 左側面（ライトグレー）
-COLOR_RIGHT = 5  # 右側面（ダークグレー）
 
 class App:
     def __init__(self):
@@ -515,9 +520,9 @@ class App:
         is_selected = self.selected_tile == (grid_x, grid_y)
         
         if is_selected:
-            top_color = 9  # 青色（選択状態）
+            top_color = pyxel.COLOR_LIGHT_BLUE  # 青色（選択状態）
         elif is_hovered:
-            top_color = 10  # 緑色（ホバー状態）
+            top_color = pyxel.COLOR_CYAN  # 緑色（ホバー状態）
         
         # 上面（ひし形）を描画
         self.rect_poly(FL, FT, FR, FB, top_color)
@@ -526,7 +531,7 @@ class App:
         self.rect_polyb(FT, FL, FB, FR, COLOR_OUTLINE)
 
     def draw(self):
-        pyxel.cls(0)
+        pyxel.cls(pyxel.COLOR_BLACK)
         
         # マウスオーバー中のタイルを更新
         self.hovered_tile = self.get_tile_at_mouse()

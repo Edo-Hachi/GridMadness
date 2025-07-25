@@ -49,7 +49,7 @@ class MapGrid:
             {"attribute": 2, "color": pyxel.COLOR_GREEN, "name": "森"},         # 暗緑
             {"attribute": 3, "color": pyxel.COLOR_YELLOW, "name": "砂漠"},      # 黄色
             {"attribute": 4, "color": pyxel.COLOR_NAVY, "name": "海"},         # 青
-            {"attribute": 5, "color": pyxel.COLOR_RED, "name": "山"},         # 赤
+            {"attribute": 5, "color": pyxel.COLOR_ORANGE, "name": "山"},         # 赤
         ]
         
         for y in range(self.map_size):
@@ -413,14 +413,27 @@ class App:
             self.update_viewport_tiles()
         
         # 矢印キーでカメラ移動（表示位置の微調整）
+        # ↑↓を反転、←→を反転（UIコンフィグ設定で切り替え可能にするため、元のコードを保持）
+        
+        # 新しい操作: ↑↓反転、←→反転
         if pyxel.btn(pyxel.KEY_LEFT):
-            self.iso_x_offset -= 2
+            self.iso_x_offset += 2  # 左キー → 右移動（反転）
         if pyxel.btn(pyxel.KEY_RIGHT):
-            self.iso_x_offset += 2
+            self.iso_x_offset -= 2  # 右キー → 左移動（反転）
         if pyxel.btn(pyxel.KEY_UP):
-            self.iso_y_offset -= 2
+            self.iso_y_offset += 2  # 上キー → 下移動（反転）
         if pyxel.btn(pyxel.KEY_DOWN):
-            self.iso_y_offset += 2
+            self.iso_y_offset -= 2  # 下キー → 上移動（反転）
+        
+        # 元の操作（UIコンフィグ設定用に保持、コメントアウト）
+        # if pyxel.btn(pyxel.KEY_LEFT):
+        #     self.iso_x_offset -= 2
+        # if pyxel.btn(pyxel.KEY_RIGHT):
+        #     self.iso_x_offset += 2
+        # if pyxel.btn(pyxel.KEY_UP):
+        #     self.iso_y_offset -= 2
+        # if pyxel.btn(pyxel.KEY_DOWN):
+        #     self.iso_y_offset += 2
         
         # マウスクリックでタイル選択
         if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
@@ -527,8 +540,9 @@ class App:
         # 上面（ひし形）を描画
         self.rect_poly(FL, FT, FR, FB, top_color)
         
-        # 上面の枠線を描画
-        self.rect_polyb(FT, FL, FB, FR, COLOR_OUTLINE)
+        # 上面の枠線を描画（ホバー時は赤、通常時は白）
+        outline_color = pyxel.COLOR_RED if is_hovered else COLOR_OUTLINE
+        self.rect_polyb(FT, FL, FB, FR, outline_color)
 
     def draw(self):
         pyxel.cls(pyxel.COLOR_BLACK)
@@ -551,9 +565,11 @@ class App:
         for depth, x, y in tiles_with_depth:
             self.draw_diamond_tile(x, y)
         
-        # ビューポート情報とタイル色表示を追加
-        tile_center = self.current_tiles[8][8]  # 中央タイル
-        pyxel.rect(220, 5, 30, 30, tile_center.color)  # タイル色サンプル
+        # 選択されたタイルの色表示
+        if self.selected_tile:
+            x, y = self.selected_tile
+            selected_tile = self.current_tiles[y][x]
+            pyxel.rect(235, 5, 7, 7, selected_tile.color)  # 選択タイル色サンプル（1/4サイズ）
         
         # 操作説明
         pyxel.text(5, 5, "WASD: Move viewport", 7)
@@ -570,6 +586,7 @@ class App:
         pyxel.text(5, 195, f"Rotation:{self.current_angle}deg", 7)
         pyxel.text(5, 205, f"Zoom:{self.zoom:.1f}x", 7)
         pyxel.text(5, 215, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
+        tile_center = self.current_tiles[8][8]  # 中央タイル
         pyxel.text(5, 225, f"Tile:{tile_center.floor_id}", 7)
         
         # ホバー/選択タイル情報を表示

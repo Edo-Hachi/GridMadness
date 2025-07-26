@@ -101,10 +101,14 @@ The backup version contains the full feature set described in the original docum
 
 ```
 GridMadness/
-├── main.py                    # Current: Basic isometric renderer (3x3 grid)
-├── main_backup.py            # Full-featured version with rotation system
+├── main.py                    # Main: Full-featured isometric renderer with all systems
+├── isometric_renderer.py      # Unified coordinate calculation with caching
+├── mouse_hit_detector.py      # Precision diamond-shaped hit detection
+├── viewport_manager.py        # Viewport management with LRU cache (currently bypassed)
 ├── FieldGrid.py              # Grid data structures and tile management
 ├── my_resource.pyxres         # Pyxel game assets
+├── map_data.json             # Saved/loaded map data
+├── GridMadness_20250726/     # Archive: Modularized reference implementation
 ├── README.md                 # Project documentation (Japanese)
 ├── CLAUDE.md                 # Development guidance (this file)
 └── venv/                     # Python virtual environment
@@ -144,17 +148,41 @@ GridMadness/
 ### Known Issues
 
 **Mouse Collision Detection**:
-- マウスクリック当たり判定が時々ずれる問題が確認されている
-- `get_tile_at_mouse()`メソッドの座標計算が`draw_diamond_tile()`と完全に一致していない可能性
-- 特に回転・ズーム時に発生しやすい
-- 今後のデバッグ課題として記録
+- ✅ **RESOLVED**: マウスクリック当たり判定のずれ問題を解決
+- MouseHitDetectorによる精密な三角形ベースのひし形当たり判定を実装
+- 回転・ズーム時でも正確な判定が可能
+
+**ViewportManager Cache Issue** (2025-07-26):
+- ❌ **CRITICAL**: ViewportManagerのキャッシュシステムに重大な問題発見
+- **症状**: F2/F3/Cキー実行後、新しいマップデータが即座に画面反映されない
+- **原因**: ViewportManagerのLRUキャッシュが`clear_cache()`後も古いデータを返す
+- **影響**: JSONロード、ランダムマップ生成、リセット機能の動作不良
 
 **Technical Details**:
-- 中央矩形法による当たり判定を使用中
-- ひし形の実際の形状ではなく、中央の矩形エリアで判定
-- より精密なひし形当たり判定への改善が必要
+- **問題箇所**: `ViewportManager.get_current_tiles()`メソッド
+- **症状詳細**: 
+  ```
+  MapGrid直接アクセス:     height=5, color=3  (正しい新データ)
+  ViewportManager経由:     height=1, color=11 (古いキャッシュ)
+  ```
+- **緊急対応**: ViewportManagerをバイパスして直接MapGridアクセスに変更
+- **現在の実装**: `self.current_tiles = self.map_grid.get_viewport_tiles()`
+
+**Future Fix Required**:
+- ViewportManagerのキャッシュ機能を完全に見直す必要
+- LRUキャッシュの実装に根本的な問題がある可能性
+- 一時的なバイパス実装のため、パフォーマンス最適化が無効化されている
 
 ### Development Log
+
+**2025-07-26: モジュール化リファクタリング完了**
+- GridMadness_20250726からIsometricRenderer・MouseHitDetector・ViewportManagerを統合
+- IsometricRendererによる座標計算の統一とキャッシュ機能実装
+- MouseHitDetectorによる精密なひし形当たり判定（三角形分割法）
+- 高さシステム変更：HEIGHT_UNIT=3ピクセル、1-5段階の高さ範囲
+- 側面ポリゴンの高さ反映修正（ズーム対応）
+- カメラ操作の改善：矢印キー上下左右リバース
+- ViewportManagerキャッシュ問題発見と緊急対応（直接MapGridアクセス）
 
 **2025-07-23: 完全システム実装完了**
 - main.py を main_backup.py を参考に完全作り直し

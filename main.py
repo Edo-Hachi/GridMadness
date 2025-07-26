@@ -4,6 +4,8 @@ import random
 import json
 from dataclasses import dataclass, asdict
 from isometric_renderer import IsometricRenderer, CameraState
+from mouse_hit_detector import MouseHitDetector
+from viewport_manager import ViewportManager
 
 # タイルデータ構造
 @dataclass
@@ -250,6 +252,19 @@ class App:
         print("MapGridを初期化中...")
         self.map_grid = MapGrid(256)
         
+        # ViewportManagerを初期化
+        self.viewport_manager = ViewportManager(self.map_grid, viewport_size=VIEWPORT_SIZE)
+        self.viewport_manager.set_viewport_position(self.viewport_x, self.viewport_y)
+        
+        # MouseHitDetectorを初期化
+        self.mouse_hit_detector = MouseHitDetector(
+            self.iso_renderer, 
+            self.viewport_manager,
+            cell_size=CELL_SIZE,
+            height_unit=HEIGHT_UNIT,
+            debug_mode=False
+        )
+        
         # 現在のビューポートタイルを取得
         self.update_viewport_tiles()
         
@@ -259,9 +274,26 @@ class App:
     
     def update_viewport_tiles(self):
         """現在のビューポート位置から16x16タイルを取得"""
+        # ViewportManagerの位置を更新
+        self.viewport_manager.set_viewport_position(self.viewport_x, self.viewport_y)
+        
+        # デバッグ: MapGridから直接タイルを取得して比較
+        direct_tile = self.map_grid.get_tile(self.viewport_x + 8, self.viewport_y + 8)
+        print(f"DEBUG: Direct MapGrid access - height={direct_tile.height}, color={direct_tile.color}")
+        
+        # 一時的修正: ViewportManagerを使わずに直接MapGridから取得
         self.current_tiles = self.map_grid.get_viewport_tiles(
             self.viewport_x, self.viewport_y, self.viewport_size
         )
+        
+        # デバッグ: 更新後のタイル情報を確認
+        if self.current_tiles and len(self.current_tiles) > 8 and len(self.current_tiles[8]) > 8:
+            center_tile = self.current_tiles[8][8]
+            print(f"DEBUG: Updated viewport center tile - height={center_tile.height}, color={center_tile.color}")
+            
+            # ViewportManagerのキャッシュ統計も確認
+            cache_stats = self.viewport_manager.get_cache_stats()
+            print(f"DEBUG: ViewportManager cache stats - tile_cache_size={cache_stats['tile_cache_size']}, viewport_cache_size={cache_stats['viewport_cache_size']}")
     
     @property
     def current_angle(self):
@@ -289,33 +321,13 @@ class App:
         return left <= point_x <= right and top <= point_y <= bottom
     
     def get_tile_at_mouse(self):
-        """マウスカーソル下にあるタイルを返す"""
-        # 全タイルを走査してマウス座標との当たりを検出
-        for y in range(self.viewport_size):
-            for x in range(self.viewport_size):
-                tile = self.current_tiles[y][x]
-                
-                # IsometricRendererを使用してアイソメトリック座標を計算
-                iso_x, iso_y = self.iso_renderer.grid_to_iso(x, y, tile.height, self.camera_state)
-                
-                # ズーム適用されたセルサイズ
-                scaled_cell_size = int(CELL_SIZE * self.camera_state.zoom)
-                
-                # ひし形の中心座標を計算
-                diamond_center_x = iso_x + scaled_cell_size // 2
-                diamond_center_y = iso_y + scaled_cell_size // 4
-                
-                # ひし形のサイズ
-                diamond_width = scaled_cell_size
-                diamond_height = scaled_cell_size // 2
-                
-                # 中心矩形で当たり判定
-                if self.is_point_in_center_rect(self.mouse_x, self.mouse_y, 
-                                               diamond_center_x, diamond_center_y, 
-                                               diamond_width, diamond_height):
-                    return (x, y)
-        
-        return None
+        """マウスカーソル下にあるタイルを返す（MouseHitDetector使用）"""
+        return self.mouse_hit_detector.get_tile_at_mouse(
+            self.mouse_x, self.mouse_y, 
+            self.camera_state, 
+            self.current_tiles,
+            WIN_WIDTH, WIN_HEIGHT
+        )
 
     def update(self):
         if pyxel.btnp(pyxel.KEY_ESCAPE):
@@ -394,6 +406,16 @@ class App:
             )
             # 回転をリセット
             self.rotation_index = self.initial_rotation_index
+            self.update_camera_rotation()
+            
+            # 各種キャッシュをクリア
+            self.iso_renderer.clear_cache()
+            self.viewport_manager.clear_cache()
+            self.mouse_hit_detector.clear_cache()
+            
+            # current_tilesを強制リセット
+            self.current_tiles = None
+            
             # ビューポートタイルを更新
             self.update_viewport_tiles()
         
@@ -420,6 +442,18 @@ class App:
         
         if pyxel.btnp(pyxel.KEY_F2):  # F2キーで読み込み
             if self.map_grid.load_from_json():
+                # 各種キャッシュをクリア（新しいマップデータを反映するため）
+                self.iso_renderer.clear_cache()
+                self.viewport_manager.clear_cache()
+                self.mouse_hit_detector.clear_cache()
+                
+                # current_tilesを強制リセット
+                self.current_tiles = None
+                
+                # デバッグ: 読み込まれたマップデータを確認
+                test_tile = self.map_grid.get_tile(self.viewport_x + 8, self.viewport_y + 8)
+                print(f"DEBUG F2: Loaded tile at center - height={test_tile.height}, color={test_tile.color}")
+                
                 # 読み込み成功時、ビューポートを更新
                 self.update_viewport_tiles()
                 self.last_save_load_message = "Map Loaded!"
@@ -430,6 +464,19 @@ class App:
         
         if pyxel.btnp(pyxel.KEY_F3):  # F3キーでランダムマップ生成
             self.map_grid.generate_random_map()
+            
+            # デバッグ: 生成されたマップデータを確認
+            test_tile = self.map_grid.get_tile(self.viewport_x + 8, self.viewport_y + 8)
+            print(f"DEBUG F3: Generated tile at center - height={test_tile.height}, color={test_tile.color}")
+            
+            # 各種キャッシュをクリア（新しいマップデータを反映するため）
+            self.iso_renderer.clear_cache()
+            self.viewport_manager.clear_cache()
+            self.mouse_hit_detector.clear_cache()
+            
+            # current_tilesを強制リセット
+            self.current_tiles = None
+            
             self.update_viewport_tiles()
             self.last_save_load_message = "Random Map Generated!"
             self.message_timer = 120

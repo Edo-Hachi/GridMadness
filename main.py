@@ -303,7 +303,58 @@ class App:
             WIN_WIDTH, WIN_HEIGHT
         )
     
-    def draw_compass_labels(self):
+    def draw_compass_ui(self):
+        """画面の右上に、回転と同期したUIコンパスを描画する"""
+        
+        # コンパスの中心座標と半径（画面の右上）
+        compass_center_x = WIN_WIDTH - 25
+        compass_center_y = 25
+        radius = 20
+
+        # コンパスの背景円
+        pyxel.circb(compass_center_x, compass_center_y, radius, 7) # 外枠
+        pyxel.circ(compass_center_x, compass_center_y, radius - 6, 0) # 内側を黒で塗りつぶし
+
+        # 現在のカメラの回転角度（度）
+        camera_angle_deg = self.current_angle
+
+        # 各方角のラベルと角度（0度が右）
+        # directions = {
+        #     "N": -45,
+        #     "E": 45,
+        #     "S": 135,
+        #     "W": 225
+        # }
+
+        directions = {
+            "N": 0,
+            "E": 90,
+            "S": 180,
+            "W": 270
+        }
+
+
+        for label, angle_deg in directions.items():
+            # カメラの回転を適用した最終的な角度
+            final_angle_deg = angle_deg + camera_angle_deg
+            final_angle_rad = math.radians(final_angle_deg)
+
+            # ラベルの描画位置を計算
+            text_x = compass_center_x + (radius - 4) * math.sin(final_angle_rad)
+            text_y = compass_center_y - (radius - 4) * math.cos(final_angle_rad)
+
+            # 北（N）を赤で強調表示
+            color = 8 if label == "N" else 7
+
+            # 文字を描画（中央揃えのため微調整）
+            pyxel.text(
+                int(text_x - pyxel.FONT_WIDTH / 2),
+                int(text_y - pyxel.FONT_HEIGHT / 2),
+                label,
+                color
+            )
+
+    def draw_compass_on_viewport(self):
         """ビューポート四隅にNEWS方角を表示（回転対応）"""
         
         # 4つの角の座標と、その位置に表示する固定の方角
@@ -604,11 +655,12 @@ class App:
             self.draw_diamond_tile(x, y)
         
         # 方角表示を描画
-        self.draw_compass_labels()
+        self.draw_compass_ui()
+        self.draw_compass_on_viewport()
         
         # ビューポート情報とタイル色表示を追加
         tile_center = self.current_tiles[8][8]  # 中央タイル
-        pyxel.rect(220, 5, 30, 30, tile_center.color)  # タイル色サンプル
+        #pyxel.rect(220, 5, 30, 30, tile_center.color)  # タイル色サンプル
         
         # 操作説明
         pyxel.text(5, 5, "WASD: Move viewport", 7)

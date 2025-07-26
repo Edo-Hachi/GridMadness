@@ -4,19 +4,6 @@ import random
 import json
 from dataclasses import dataclass, asdict
 
-# 定数設定
-WIN_WIDTH = 256
-WIN_HEIGHT = 192
-VIEWPORT_SIZE = 16  # 16x16ビューポート
-CELL_SIZE = 16  # タイルサイズを小さく（16x16表示のため）
-HEIGHT_UNIT = 5  # 高さ単位（1段=5ピクセル）
-
-# 色定数
-COLOR_OUTLINE = pyxel.COLOR_WHITE
-COLOR_TOP = pyxel.COLOR_LIME
-COLOR_LEFT = pyxel.COLOR_GRAY   # 左側面（ライトグレー）
-COLOR_RIGHT = pyxel.COLOR_DARK_BLUE  # 右側面（ダークグレー）
-
 # タイルデータ構造
 @dataclass
 class Tile:
@@ -40,16 +27,13 @@ class MapGrid:
         """ランダムなマップデータを生成する"""
         print(f"256x256マップを生成中...")
         
-        # 既存のタイルデータをクリア
-        self.tiles = []
-        
         # 地形属性の定義
         terrain_types = [
-            {"attribute": 1, "color": pyxel.COLOR_LIME, "name": "草地"},      # 明緑
-            {"attribute": 2, "color": pyxel.COLOR_GREEN, "name": "森"},         # 暗緑
-            {"attribute": 3, "color": pyxel.COLOR_YELLOW, "name": "砂漠"},      # 黄色
-            {"attribute": 4, "color": pyxel.COLOR_NAVY, "name": "海"},         # 青
-            {"attribute": 5, "color": pyxel.COLOR_ORANGE, "name": "山"},         # 赤
+            {"attribute": 1, "color": 11, "name": "草地"},      # 明緑
+            {"attribute": 2, "color": 3, "name": "森"},         # 暗緑
+            {"attribute": 3, "color": 12, "name": "砂漠"},      # 黄色
+            {"attribute": 4, "color": 1, "name": "海"},         # 青
+            {"attribute": 5, "color": 8, "name": "山"},         # 赤
         ]
         
         for y in range(self.map_size):
@@ -58,8 +42,8 @@ class MapGrid:
                 # floor_idを座標ベースで生成（xxx_yyy形式）
                 floor_id = f"{x:03d}_{y:03d}"
                 
-                # ランダムな高さ（1-5の範囲）
-                height = random.randint(1, 5)
+                # ランダムな高さ（1-15の範囲）
+                height = random.randint(1, 15)
                 
                 # ランダムな地形タイプを選択
                 terrain = random.choice(terrain_types)
@@ -75,7 +59,7 @@ class MapGrid:
                 row.append(tile)
             self.tiles.append(row)
         
-        print(f"256x256マップ生成完了！")
+        print(f"256x256マップ生成完了!")
     
     def create_empty_map(self):
         """空のマップ（全て基本地形）を生成する"""
@@ -90,7 +74,7 @@ class MapGrid:
                 # 基本設定（平坦な草地）
                 height = 1          # 最低高さ
                 attribute = 1       # 草地属性
-                color = pyxel.COLOR_LIME          # 明緑色
+                color = 11          # 明緑色
                 
                 tile = Tile(
                     floor_id=floor_id,
@@ -124,7 +108,7 @@ class MapGrid:
                         floor_id=f"{map_x:03d}_{map_y:03d}",
                         height=1,
                         attribute=0,
-                        color=pyxel.COLOR_BLACK  # 黒
+                        color=0  # 黒
                     )
                 row.append(tile)
             viewport.append(row)
@@ -184,7 +168,7 @@ class MapGrid:
                     )
                     row.append(tile)
                 new_tiles.append(row)
-
+            
             # 既存のタイルデータを置き換え
             self.tiles = new_tiles
             print(f"読み込み完了: {filename}")
@@ -197,7 +181,18 @@ class MapGrid:
             print(f"読み込みエラー: {e}")
             return False
 
+# 定数設定
+WIN_WIDTH = 256
+WIN_HEIGHT = 256
+VIEWPORT_SIZE = 16  # 16x16ビューポート
+CELL_SIZE = 16  # タイルサイズを小さく（16x16表示のため）
+HEIGHT_UNIT = 2  # 高さ単位を小さく（密集表示のため）
 
+# 色定数
+COLOR_OUTLINE = 7
+COLOR_TOP = 11
+COLOR_LEFT = 6   # 左側面（ライトグレー）
+COLOR_RIGHT = 5  # 右側面（ダークグレー）
 
 class App:
     def __init__(self):
@@ -413,27 +408,14 @@ class App:
             self.update_viewport_tiles()
         
         # 矢印キーでカメラ移動（表示位置の微調整）
-        # ↑↓を反転、←→を反転（UIコンフィグ設定で切り替え可能にするため、元のコードを保持）
-        
-        # 新しい操作: ↑↓反転、←→反転
         if pyxel.btn(pyxel.KEY_LEFT):
-            self.iso_x_offset += 2  # 左キー → 右移動（反転）
+            self.iso_x_offset -= 2
         if pyxel.btn(pyxel.KEY_RIGHT):
-            self.iso_x_offset -= 2  # 右キー → 左移動（反転）
+            self.iso_x_offset += 2
         if pyxel.btn(pyxel.KEY_UP):
-            self.iso_y_offset += 2  # 上キー → 下移動（反転）
+            self.iso_y_offset -= 2
         if pyxel.btn(pyxel.KEY_DOWN):
-            self.iso_y_offset -= 2  # 下キー → 上移動（反転）
-        
-        # 元の操作（UIコンフィグ設定用に保持、コメントアウト）
-        # if pyxel.btn(pyxel.KEY_LEFT):
-        #     self.iso_x_offset -= 2
-        # if pyxel.btn(pyxel.KEY_RIGHT):
-        #     self.iso_x_offset += 2
-        # if pyxel.btn(pyxel.KEY_UP):
-        #     self.iso_y_offset -= 2
-        # if pyxel.btn(pyxel.KEY_DOWN):
-        #     self.iso_y_offset += 2
+            self.iso_y_offset += 2
         
         # マウスクリックでタイル選択
         if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
@@ -533,19 +515,18 @@ class App:
         is_selected = self.selected_tile == (grid_x, grid_y)
         
         if is_selected:
-            top_color = pyxel.COLOR_LIGHT_BLUE  # 青色（選択状態）
+            top_color = 9  # 青色（選択状態）
         elif is_hovered:
-            top_color = pyxel.COLOR_CYAN  # 緑色（ホバー状態）
+            top_color = 10  # 緑色（ホバー状態）
         
         # 上面（ひし形）を描画
         self.rect_poly(FL, FT, FR, FB, top_color)
         
-        # 上面の枠線を描画（ホバー時は赤、通常時は白）
-        outline_color = pyxel.COLOR_RED if is_hovered else COLOR_OUTLINE
-        self.rect_polyb(FT, FL, FB, FR, outline_color)
+        # 上面の枠線を描画
+        self.rect_polyb(FT, FL, FB, FR, COLOR_OUTLINE)
 
     def draw(self):
-        pyxel.cls(pyxel.COLOR_BLACK)
+        pyxel.cls(0)
         
         # マウスオーバー中のタイルを更新
         self.hovered_tile = self.get_tile_at_mouse()
@@ -565,11 +546,9 @@ class App:
         for depth, x, y in tiles_with_depth:
             self.draw_diamond_tile(x, y)
         
-        # 選択されたタイルの色表示
-        if self.selected_tile:
-            x, y = self.selected_tile
-            selected_tile = self.current_tiles[y][x]
-            pyxel.rect(235, 5, 7, 7, selected_tile.color)  # 選択タイル色サンプル（1/4サイズ）
+        # ビューポート情報とタイル色表示を追加
+        tile_center = self.current_tiles[8][8]  # 中央タイル
+        pyxel.rect(220, 5, 30, 30, tile_center.color)  # タイル色サンプル
         
         # 操作説明
         pyxel.text(5, 5, "WASD: Move viewport", 7)
@@ -586,7 +565,6 @@ class App:
         pyxel.text(5, 195, f"Rotation:{self.current_angle}deg", 7)
         pyxel.text(5, 205, f"Zoom:{self.zoom:.1f}x", 7)
         pyxel.text(5, 215, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
-        tile_center = self.current_tiles[8][8]  # 中央タイル
         pyxel.text(5, 225, f"Tile:{tile_center.floor_id}", 7)
         
         # ホバー/選択タイル情報を表示

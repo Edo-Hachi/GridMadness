@@ -182,12 +182,13 @@ class ViewportManager:
         
         return False
     
-    def set_viewport_position(self, x: int, y: int) -> bool:
+    def set_viewport_position(self, x: int, y: int, force_update: bool = False) -> bool:
         """
         ビューポート位置を直接設定
         
         Args:
             x, y: 新しい位置
+            force_update: 位置が同じでも強制的に更新するかどうか
             
         Returns:
             位置が変更されたかどうか
@@ -196,7 +197,7 @@ class ViewportManager:
         x = max(0, min(x, 256 - self.viewport_state.size))
         y = max(0, min(y, 256 - self.viewport_state.size))
         
-        if x != self.viewport_state.x or y != self.viewport_state.y:
+        if x != self.viewport_state.x or y != self.viewport_state.y or force_update:
             self.viewport_state.x = x
             self.viewport_state.y = y
             self._update_current_tiles()
@@ -267,6 +268,9 @@ class ViewportManager:
         self.cache_misses = 0
         self.viewport_cache_hits = 0
         self.viewport_cache_misses = 0
+        
+        # current_tilesも強制的に更新
+        self._update_current_tiles()
     
     def get_cache_stats(self) -> Dict[str, Any]:
         """キャッシュ統計を取得"""

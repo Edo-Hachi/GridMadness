@@ -2,6 +2,7 @@
 *.pyc
 __pycache__/
 commit.txt
+commit.md
 _memo/
 GridMadness_20250726/
 

@@ -28,7 +28,6 @@ class MapGrid:
     
     def generate_random_map(self):
         """ランダムなマップデータを生成する"""
-        print(f"256x256マップを生成中...")
         
         # 既存のタイルデータをクリア
         self.tiles.clear()
@@ -65,11 +64,9 @@ class MapGrid:
                 row.append(tile)
             self.tiles.append(row)
         
-        print(f"256x256マップ生成完了!")
     
     def create_empty_map(self):
         """空のマップ（全て基本地形）を生成する"""
-        print(f"空の{self.map_size}x{self.map_size}マップを初期化中...")
         
         for y in range(self.map_size):
             row = []
@@ -91,7 +88,6 @@ class MapGrid:
                 row.append(tile)
             self.tiles.append(row)
         
-        print(f"空のマップ初期化完了！")
     
     def get_tile(self, x, y):
         """指定座標のタイルを取得（範囲外チェック付き）"""
@@ -122,7 +118,6 @@ class MapGrid:
     
     def save_to_json(self, filename="map_data.json"):
         """マップデータをJSONファイルに保存"""
-        print(f"マップデータを{filename}に保存中...")
         
         # タイルデータを辞書形式に変換
         map_data = {
@@ -141,15 +136,12 @@ class MapGrid:
         try:
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(map_data, f, ensure_ascii=False, indent=2)
-            print(f"保存完了: {filename}")
             return True
         except Exception as e:
-            print(f"保存エラー: {e}")
             return False
     
     def load_from_json(self, filename="map_data.json"):
         """JSONファイルからマップデータを読み込み"""
-        print(f"{filename}からマップデータを読み込み中...")
         
         try:
             with open(filename, 'r', encoding='utf-8') as f:
@@ -157,7 +149,6 @@ class MapGrid:
             
             # マップサイズの確認
             if map_data["map_size"] != self.map_size:
-                print(f"警告: ファイルのマップサイズ({map_data['map_size']})が異なります")
                 return False
             
             # タイルデータを復元
@@ -177,14 +168,11 @@ class MapGrid:
             
             # 既存のタイルデータを置き換え
             self.tiles = new_tiles
-            print(f"読み込み完了: {filename}")
             return True
             
         except FileNotFoundError:
-            print(f"ファイルが見つかりません: {filename}")
             return False
         except Exception as e:
-            print(f"読み込みエラー: {e}")
             return False
 
 # 定数設定
@@ -249,7 +237,6 @@ class App:
         self.message_timer = 0
         
         # 256x256のマップグリッドを生成
-        print("MapGridを初期化中...")
         self.map_grid = MapGrid(256)
         
         # ViewportManagerを初期化
@@ -277,23 +264,10 @@ class App:
         # ViewportManagerの位置を更新
         self.viewport_manager.set_viewport_position(self.viewport_x, self.viewport_y)
         
-        # デバッグ: MapGridから直接タイルを取得して比較
-        direct_tile = self.map_grid.get_tile(self.viewport_x + 8, self.viewport_y + 8)
-        print(f"DEBUG: Direct MapGrid access - height={direct_tile.height}, color={direct_tile.color}")
         
-        # 一時的修正: ViewportManagerを使わずに直接MapGridから取得
-        self.current_tiles = self.map_grid.get_viewport_tiles(
-            self.viewport_x, self.viewport_y, self.viewport_size
-        )
+        # 修正版ViewportManagerを使用（force_update付き）
+        self.current_tiles = self.viewport_manager.get_current_tiles()
         
-        # デバッグ: 更新後のタイル情報を確認
-        if self.current_tiles and len(self.current_tiles) > 8 and len(self.current_tiles[8]) > 8:
-            center_tile = self.current_tiles[8][8]
-            print(f"DEBUG: Updated viewport center tile - height={center_tile.height}, color={center_tile.color}")
-            
-            # ViewportManagerのキャッシュ統計も確認
-            cache_stats = self.viewport_manager.get_cache_stats()
-            print(f"DEBUG: ViewportManager cache stats - tile_cache_size={cache_stats['tile_cache_size']}, viewport_cache_size={cache_stats['viewport_cache_size']}")
     
     @property
     def current_angle(self):
@@ -408,13 +382,10 @@ class App:
             self.rotation_index = self.initial_rotation_index
             self.update_camera_rotation()
             
-            # 各種キャッシュをクリア
+            # 各種キャッシュをクリア（ViewportManagerが自動でcurrent_tilesも更新）
             self.iso_renderer.clear_cache()
             self.viewport_manager.clear_cache()
             self.mouse_hit_detector.clear_cache()
-            
-            # current_tilesを強制リセット
-            self.current_tiles = None
             
             # ビューポートタイルを更新
             self.update_viewport_tiles()
@@ -442,17 +413,11 @@ class App:
         
         if pyxel.btnp(pyxel.KEY_F2):  # F2キーで読み込み
             if self.map_grid.load_from_json():
-                # 各種キャッシュをクリア（新しいマップデータを反映するため）
+                # 各種キャッシュをクリア（ViewportManagerが自動でcurrent_tilesも更新）
                 self.iso_renderer.clear_cache()
                 self.viewport_manager.clear_cache()
                 self.mouse_hit_detector.clear_cache()
                 
-                # current_tilesを強制リセット
-                self.current_tiles = None
-                
-                # デバッグ: 読み込まれたマップデータを確認
-                test_tile = self.map_grid.get_tile(self.viewport_x + 8, self.viewport_y + 8)
-                print(f"DEBUG F2: Loaded tile at center - height={test_tile.height}, color={test_tile.color}")
                 
                 # 読み込み成功時、ビューポートを更新
                 self.update_viewport_tiles()
@@ -465,17 +430,11 @@ class App:
         if pyxel.btnp(pyxel.KEY_F3):  # F3キーでランダムマップ生成
             self.map_grid.generate_random_map()
             
-            # デバッグ: 生成されたマップデータを確認
-            test_tile = self.map_grid.get_tile(self.viewport_x + 8, self.viewport_y + 8)
-            print(f"DEBUG F3: Generated tile at center - height={test_tile.height}, color={test_tile.color}")
             
-            # 各種キャッシュをクリア（新しいマップデータを反映するため）
+            # 各種キャッシュをクリア（ViewportManagerが自動でcurrent_tilesも更新）
             self.iso_renderer.clear_cache()
             self.viewport_manager.clear_cache()
             self.mouse_hit_detector.clear_cache()
-            
-            # current_tilesを強制リセット
-            self.current_tiles = None
             
             self.update_viewport_tiles()
             self.last_save_load_message = "Random Map Generated!"

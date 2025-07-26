@@ -153,25 +153,26 @@ GridMadness/
 - 回転・ズーム時でも正確な判定が可能
 
 **ViewportManager Cache Issue** (2025-07-26):
-- ❌ **CRITICAL**: ViewportManagerのキャッシュシステムに重大な問題発見
-- **症状**: F2/F3/Cキー実行後、新しいマップデータが即座に画面反映されない
-- **原因**: ViewportManagerのLRUキャッシュが`clear_cache()`後も古いデータを返す
-- **影響**: JSONロード、ランダムマップ生成、リセット機能の動作不良
+- ✅ **RESOLVED**: ViewportManagerのキャッシュシステム問題を完全修正
+- **原因**: `clear_cache()`後に`self.current_tiles`が更新されていなかった
+- **根本問題**: `set_viewport_position()`が位置変更時のみ`_update_current_tiles()`を実行
+- **影響**: JSONロード、ランダムマップ生成、リセット機能の即座反映不良
 
-**Technical Details**:
-- **問題箇所**: `ViewportManager.get_current_tiles()`メソッド
-- **症状詳細**: 
+**Technical Solution**:
+- **修正1**: `clear_cache()`メソッドに`self._update_current_tiles()`を追加
+- **修正2**: `set_viewport_position()`に`force_update`オプションを追加
+- **修正3**: ViewportManager使用を復活、パフォーマンス最適化も復活
+- **結果**: 
   ```
-  MapGrid直接アクセス:     height=5, color=3  (正しい新データ)
-  ViewportManager経由:     height=1, color=11 (古いキャッシュ)
+  MapGrid直接アクセス:     height=2, color=8  ✅
+  ViewportManager経由:     height=2, color=8  ✅ (完全一致)
+  キャッシュ統計:          tile_cache_size=100, viewport_cache_size=1  ✅
   ```
-- **緊急対応**: ViewportManagerをバイパスして直接MapGridアクセスに変更
-- **現在の実装**: `self.current_tiles = self.map_grid.get_viewport_tiles()`
 
-**Future Fix Required**:
-- ViewportManagerのキャッシュ機能を完全に見直す必要
-- LRUキャッシュの実装に根本的な問題がある可能性
-- 一時的なバイパス実装のため、パフォーマンス最適化が無効化されている
+**Performance Benefits Restored**:
+- LRUキャッシュによるタイル取得の高速化が復活
+- ビューポート移動時のスムーズなレスポンス
+- メモリ効率的なタイル管理
 
 ### Development Log
 
@@ -182,7 +183,7 @@ GridMadness/
 - 高さシステム変更：HEIGHT_UNIT=3ピクセル、1-5段階の高さ範囲
 - 側面ポリゴンの高さ反映修正（ズーム対応）
 - カメラ操作の改善：矢印キー上下左右リバース
-- ViewportManagerキャッシュ問題発見と緊急対応（直接MapGridアクセス）
+- ViewportManagerキャッシュ問題の完全修正（パフォーマンス最適化復活）
 
 **2025-07-23: 完全システム実装完了**
 - main.py を main_backup.py を参考に完全作り直し

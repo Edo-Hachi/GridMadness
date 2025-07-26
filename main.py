@@ -302,6 +302,84 @@ class App:
             self.current_tiles,
             WIN_WIDTH, WIN_HEIGHT
         )
+    
+    def draw_compass_labels(self):
+        """ビューポート四隅にNEWS方角を表示（回転対応）"""
+        
+        # 4つの角の座標と、その位置に表示する固定の方角
+        compass_positions = [
+            (0, 0, "N"),                    # 左上の角に北（N）
+            (0, self.viewport_size-1, "W"), # 左下の角に西（W）
+            (self.viewport_size-1, 0, "E"), # 右上の角に東（E）
+            (self.viewport_size-1, self.viewport_size-1, "S") # 右下の角に南（S）
+        ]
+        
+        for grid_x, grid_y, direction in compass_positions:
+            # IsometricRendererを使用してタイル座標を取得
+            tile = self.current_tiles[grid_y][grid_x]
+            iso_x, iso_y = self.iso_renderer.grid_to_iso(grid_x, grid_y, tile.height, self.camera_state)
+            
+            # ズーム適用されたセルサイズ
+            scaled_cell_size = int(CELL_SIZE * self.camera_state.zoom)
+            
+            # ひし形の中心座標を計算
+            tile_center_x = iso_x + scaled_cell_size // 2
+            tile_center_y = iso_y + scaled_cell_size // 4
+            
+            # 固定オフセット表（マップの実際の方向を指すための4つの基本方向）
+            up_offset = (0, -25)      # 上方向（マップの北）
+            right_offset = (25, 0)    # 右方向（マップの東）  
+            down_offset = (0, 25)     # 下方向（マップの南）
+            left_offset = (-25, 0)    # 左方向（マップの西）
+            
+            # 回転に応じてN/E/S/Wの表示方向を割り当て
+            # これにより、ビューポートが回転してもマップの実際の方向を指す
+            if 0 <= self.rotation_index <= 5:
+                # 0-5: 基準（N=上, E=右, S=下, W=左）
+                n_offset = up_offset
+                e_offset = right_offset
+                s_offset = down_offset
+                w_offset = left_offset
+                
+            elif 6 <= self.rotation_index <= 11:
+                # 6-11: 90度回転（N=右, E=下, S=左, W=上）
+                n_offset = right_offset
+                e_offset = down_offset
+                s_offset = left_offset
+                w_offset = up_offset
+                
+            elif 12 <= self.rotation_index <= 17:
+                # 12-17: 180度回転（N=下, E=左, S=上, W=右）
+                n_offset = down_offset
+                e_offset = left_offset
+                s_offset = up_offset
+                w_offset = right_offset
+                
+            elif 18 <= self.rotation_index <= 23:
+                # 18-23: 270度回転（N=左, E=上, S=右, W=下）
+                n_offset = left_offset
+                e_offset = up_offset
+                s_offset = right_offset
+                w_offset = down_offset
+            
+            # 各方角に応じたオフセットを適用して表示位置を決定
+            if direction == "N":
+                text_x = tile_center_x + n_offset[0]
+                text_y = tile_center_y + n_offset[1]
+            elif direction == "E":
+                text_x = tile_center_x + e_offset[0]
+                text_y = tile_center_y + e_offset[1]
+            elif direction == "S":
+                text_x = tile_center_x + s_offset[0]
+                text_y = tile_center_y + s_offset[1]
+            elif direction == "W":
+                text_x = tile_center_x + w_offset[0]
+                text_y = tile_center_y + w_offset[1]
+            
+            # 画面範囲内チェック
+            if 0 <= text_x < WIN_WIDTH and 0 <= text_y < WIN_HEIGHT:
+                # 方角文字を描画（赤色で目立つように）
+                pyxel.text(int(text_x), int(text_y), direction, 8)
 
     def update(self):
         if pyxel.btnp(pyxel.KEY_ESCAPE):
@@ -524,6 +602,9 @@ class App:
         # ソート済みの順序で描画（奥から手前の順にタイルを描画）
         for depth, x, y in tiles_with_depth:
             self.draw_diamond_tile(x, y)
+        
+        # 方角表示を描画
+        self.draw_compass_labels()
         
         # ビューポート情報とタイル色表示を追加
         tile_center = self.current_tiles[8][8]  # 中央タイル

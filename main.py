@@ -3,6 +3,7 @@ import math
 import random
 import json
 from dataclasses import dataclass, asdict
+from isometric_renderer import IsometricRenderer, CameraState
 
 # タイルデータ構造
 @dataclass
@@ -27,6 +28,9 @@ class MapGrid:
         """ランダムなマップデータを生成する"""
         print(f"256x256マップを生成中...")
         
+        # 既存のタイルデータをクリア
+        self.tiles.clear()
+        
         # 地形属性の定義
         terrain_types = [
             {"attribute": 1, "color": 11, "name": "草地"},      # 明緑
@@ -42,8 +46,8 @@ class MapGrid:
                 # floor_idを座標ベースで生成（xxx_yyy形式）
                 floor_id = f"{x:03d}_{y:03d}"
                 
-                # ランダムな高さ（1-15の範囲）
-                height = random.randint(1, 15)
+                # ランダムな高さ（1-5の範囲）
+                height = random.randint(1, 5)
                 
                 # ランダムな地形タイプを選択
                 terrain = random.choice(terrain_types)
@@ -186,7 +190,7 @@ WIN_WIDTH = 256
 WIN_HEIGHT = 256
 VIEWPORT_SIZE = 16  # 16x16ビューポート
 CELL_SIZE = 16  # タイルサイズを小さく（16x16表示のため）
-HEIGHT_UNIT = 2  # 高さ単位を小さく（密集表示のため）
+HEIGHT_UNIT = 3  # 高さ1段あたり3ピクセル
 
 # 色定数
 COLOR_OUTLINE = 7
@@ -196,10 +200,18 @@ COLOR_RIGHT = 5  # 右側面（ダークグレー）
 
 class App:
     def __init__(self):
-        # カメラパラメータ
-        self.iso_x_offset = 0
-        self.iso_y_offset = 0
-        self.zoom = 1.0
+        # IsometricRendererを初期化
+        self.iso_renderer = IsometricRenderer(cell_size=CELL_SIZE, height_unit=HEIGHT_UNIT)
+        
+        # カメラ状態を管理するCameraStateオブジェクト
+        self.camera_state = CameraState(
+            rotation=0.0,
+            zoom=1.0,
+            offset_x=0.0,
+            offset_y=0.0,
+            center_x=WIN_WIDTH // 2,
+            center_y=WIN_HEIGHT // 2
+        )
         
         # ビューポート位置（256x256マップ内の表示開始位置）
         self.viewport_x = 120  # マップ中央付近から開始
@@ -211,12 +223,17 @@ class App:
         self.rotation_index = 0  # 現在の回転ステップ番号
         self.max_rotations = 360 // self.rotation_step  # 24方向
         
-        # 初期値の保存（Aキーでリセットするため）
+        # 初期値の保存（リセット用）
         self.initial_viewport_x = self.viewport_x
         self.initial_viewport_y = self.viewport_y
-        self.initial_iso_x_offset = self.iso_x_offset
-        self.initial_iso_y_offset = self.iso_y_offset
-        self.initial_zoom = self.zoom
+        self.initial_camera_state = CameraState(
+            rotation=0.0,
+            zoom=1.0,
+            offset_x=0.0,
+            offset_y=0.0,
+            center_x=WIN_WIDTH // 2,
+            center_y=WIN_HEIGHT // 2
+        )
         self.initial_rotation_index = self.rotation_index
         
         # マウス座標や選択状態
@@ -251,29 +268,14 @@ class App:
         """現在の回転角度(度)を返す"""
         return self.rotation_index * self.rotation_step
     
-    def get_rotated_coordinates(self, grid_x, grid_y):
-        """現在の回転角度を用いてグリッド座標を回転させる"""
-        angle_rad = math.radians(self.current_angle)
-        
-        # グリッド中心からの相対座標
-        center = self.viewport_size // 2
-        rel_x = grid_x - center
-        rel_y = grid_y - center
-        
-        # 回転変換
-        rotated_x = rel_x * math.cos(angle_rad) - rel_y * math.sin(angle_rad)
-        rotated_y = rel_x * math.sin(angle_rad) + rel_y * math.cos(angle_rad)
-        
-        return rotated_x, rotated_y
+    def update_camera_rotation(self):
+        """回転インデックスからカメラ状態を更新"""
+        self.camera_state.rotation = self.current_angle
     
     def get_tile_depth(self, grid_x, grid_y):
         """Z-ソート用にタイルの描画順を決めるための深度値を計算する"""
-        rotated_x, rotated_y = self.get_rotated_coordinates(grid_x, grid_y)
         tile = self.current_tiles[grid_y][grid_x]
-        
-        # 深度 = 回転後のY座標 + 高さ（後ろにあるものほど先に描画）
-        depth = rotated_y - tile.height * 0.1
-        return depth
+        return self.iso_renderer.get_tile_depth(grid_x, grid_y, tile.height, self.camera_state)
     
     def is_point_in_center_rect(self, point_x, point_y, diamond_center_x, diamond_center_y, diamond_width, diamond_height):
         """中央の矩形を用いたシンプルな当たり判定を行う"""
@@ -288,38 +290,20 @@ class App:
     
     def get_tile_at_mouse(self):
         """マウスカーソル下にあるタイルを返す"""
-        center_x = WIN_WIDTH // 2
-        center_y = WIN_HEIGHT // 2
-
         # 全タイルを走査してマウス座標との当たりを検出
         for y in range(self.viewport_size):
             for x in range(self.viewport_size):
                 tile = self.current_tiles[y][x]
-                height = tile.height
                 
-                # 回転座標を取得
-                rotated_x, rotated_y = self.get_rotated_coordinates(x, y)
-                
-                # draw_diamond_tileと同じ座標計算を使用
-                base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
-                base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset - height * HEIGHT_UNIT
-                
-                # ズーム適用（ウィンドウ中心を基準）
-                iso_x = center_x + (base_iso_x - center_x) * self.zoom
-                iso_y = center_y + (base_iso_y - center_y) * self.zoom
+                # IsometricRendererを使用してアイソメトリック座標を計算
+                iso_x, iso_y = self.iso_renderer.grid_to_iso(x, y, tile.height, self.camera_state)
                 
                 # ズーム適用されたセルサイズ
-                scaled_cell_size = int(CELL_SIZE * self.zoom)
+                scaled_cell_size = int(CELL_SIZE * self.camera_state.zoom)
                 
-                # ダイアモンド（ひし形）上面の4頂点を計算（draw_diamond_tileと同じ）
-                FT = (iso_x + scaled_cell_size // 2, iso_y)                           # 上
-                FL = (iso_x, iso_y + scaled_cell_size // 4)                          # 左
-                FR = (iso_x + scaled_cell_size, iso_y + scaled_cell_size // 4)       # 右
-                FB = (iso_x + scaled_cell_size // 2, iso_y + scaled_cell_size // 2)  # 下
-                
-                # ひし形の中心座標を正確に計算
-                diamond_center_x = (FL[0] + FR[0]) / 2  # 左右の中点
-                diamond_center_y = (FT[1] + FB[1]) / 2  # 上下の中点
+                # ひし形の中心座標を計算
+                diamond_center_x = iso_x + scaled_cell_size // 2
+                diamond_center_y = iso_y + scaled_cell_size // 4
                 
                 # ひし形のサイズ
                 diamond_width = scaled_cell_size
@@ -368,40 +352,46 @@ class App:
         # 回転処理（Q/Eキー）
         if pyxel.btnp(pyxel.KEY_Q):  # 反時計回り
             self.rotation_index = (self.rotation_index - 1) % self.max_rotations
+            self.update_camera_rotation()
         if pyxel.btnp(pyxel.KEY_E):  # 時計回り（Wの代わりにE）
             self.rotation_index = (self.rotation_index + 1) % self.max_rotations
+            self.update_camera_rotation()
         
         # ズーム機能（Z/Xキー）
         if pyxel.btn(pyxel.KEY_Z):
-            self.zoom += 0.05  # 少しずつズーム
-            if self.zoom > 3.0:  # 最大3倍まで
-                self.zoom = 3.0
+            self.camera_state.zoom += 0.05  # 少しずつズーム
+            if self.camera_state.zoom > 3.0:  # 最大3倍まで
+                self.camera_state.zoom = 3.0
         if pyxel.btn(pyxel.KEY_X):
-            self.zoom -= 0.05  # 少しずつズームアウト
-            if self.zoom < 0.3:  # 最小0.3倍まで
-                self.zoom = 0.3
+            self.camera_state.zoom -= 0.05  # 少しずつズームアウト
+            if self.camera_state.zoom < 0.3:  # 最小0.3倍まで
+                self.camera_state.zoom = 0.3
         
         # マウスホイールズーム
         wheel_y = pyxel.mouse_wheel
         if wheel_y > 0:  # ホイール前方向（上）= ズームイン
-            self.zoom += 0.1
-            if self.zoom > 3.0:
-                self.zoom = 3.0
+            self.camera_state.zoom += 0.1
+            if self.camera_state.zoom > 3.0:
+                self.camera_state.zoom = 3.0
         elif wheel_y < 0:  # ホイール後方向（下）= ズームアウト
-            self.zoom -= 0.1
-            if self.zoom < 0.3:
-                self.zoom = 0.3
+            self.camera_state.zoom -= 0.1
+            if self.camera_state.zoom < 0.3:
+                self.camera_state.zoom = 0.3
         
         # リセット処理（Cキー）
         if pyxel.btnp(pyxel.KEY_C):
             # ビューポートを中央に戻す
             self.viewport_x = self.initial_viewport_x
             self.viewport_y = self.initial_viewport_y
-            # カメラオフセットをリセット
-            self.iso_x_offset = self.initial_iso_x_offset
-            self.iso_y_offset = self.initial_iso_y_offset
-            # ズームをリセット
-            self.zoom = self.initial_zoom
+            # カメラ状態をリセット
+            self.camera_state = CameraState(
+                rotation=self.initial_camera_state.rotation,
+                zoom=self.initial_camera_state.zoom,
+                offset_x=self.initial_camera_state.offset_x,
+                offset_y=self.initial_camera_state.offset_y,
+                center_x=self.initial_camera_state.center_x,
+                center_y=self.initial_camera_state.center_y
+            )
             # 回転をリセット
             self.rotation_index = self.initial_rotation_index
             # ビューポートタイルを更新
@@ -409,13 +399,13 @@ class App:
         
         # 矢印キーでカメラ移動（表示位置の微調整）
         if pyxel.btn(pyxel.KEY_LEFT):
-            self.iso_x_offset -= 2
+            self.camera_state.offset_x += 2  # 左キーで右方向に移動（リバース）
         if pyxel.btn(pyxel.KEY_RIGHT):
-            self.iso_x_offset += 2
+            self.camera_state.offset_x -= 2  # 右キーで左方向に移動（リバース）
         if pyxel.btn(pyxel.KEY_UP):
-            self.iso_y_offset -= 2
+            self.camera_state.offset_y += 2  # 上キーで下方向に移動（リバース）
         if pyxel.btn(pyxel.KEY_DOWN):
-            self.iso_y_offset += 2
+            self.camera_state.offset_y -= 2  # 下キーで上方向に移動（リバース）
         
         # マウスクリックでタイル選択
         if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
@@ -462,49 +452,32 @@ class App:
 
     def draw_diamond_tile(self, grid_x, grid_y):
         """指定されたグリッド位置にダイアモンド型タイルを高さ付きで描画"""
-        center_x = WIN_WIDTH // 2
-        center_y = WIN_HEIGHT // 2
-        
         # 現在のビューポートタイルから高さを取得
         tile = self.current_tiles[grid_y][grid_x]
-        height = tile.height
         
-        # 回転座標を取得
-        rotated_x, rotated_y = self.get_rotated_coordinates(grid_x, grid_y)
+        # IsometricRendererを使用してアイソメトリック座標を計算
+        iso_x, iso_y = self.iso_renderer.grid_to_iso(grid_x, grid_y, tile.height, self.camera_state)
         
-        # 回転後のアイソメトリック座標計算
-        base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
-        base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset - height * HEIGHT_UNIT
+        # ズーム適用されたセルサイズ
+        scaled_cell_size = int(CELL_SIZE * self.camera_state.zoom)
         
-        # ズーム適用（ウィンドウ中心を基準）
-        iso_x = center_x + (base_iso_x - center_x) * self.zoom
-        iso_y = center_y + (base_iso_y - center_y) * self.zoom
+        # IsometricRendererを使用してダイアモンドの頂点座標を計算
+        # 注意: ズームとスケールを適用した高さ情報も渡す
+        vertices = self.iso_renderer.calculate_diamond_vertices(iso_x, iso_y, scaled_cell_size, tile.height, self.camera_state.zoom)
         
-        # 地面レベル座標もズーム適用（回転座標使用）
-        base_ground_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset
-        ground_y = center_y + (base_ground_y - center_y) * self.zoom
-        
-        # ズーム適用されたセルサイズと高さ単位
-        scaled_cell_size = int(CELL_SIZE * self.zoom)
-        scaled_height_unit = int(HEIGHT_UNIT * self.zoom)
-        
-        # ダイアモンド（ひし形）上面の4頂点を計算
-        FT = (iso_x + scaled_cell_size // 2, iso_y)                           # 上
-        FL = (iso_x, iso_y + scaled_cell_size // 4)                          # 左
-        FR = (iso_x + scaled_cell_size, iso_y + scaled_cell_size // 4)       # 右
-        FB = (iso_x + scaled_cell_size // 2, iso_y + scaled_cell_size // 2)  # 下
-        
-        # 壁面（側面）の下側座標を地面レベル基準で計算
-        BL = (FL[0], ground_y + scaled_cell_size // 4)   # 左側面の下
-        BR = (FR[0], ground_y + scaled_cell_size // 4)   # 右側面の下
-        BB = (FB[0], ground_y + scaled_cell_size // 2)   # 下側面の下
+        # 頂点を取得
+        FT = vertices['top']
+        FL = vertices['left']
+        FR = vertices['right']
+        FB = vertices['bottom']
+        BL = vertices['bottom_left']
+        BR = vertices['bottom_right']
+        BB = vertices['bottom_bottom']
         
         # 左側面を描画（ライトグレー）
-        # FL(左上) -> FB(下上) -> BB(下下) -> BL(左下) の順で平行四辺形
         self.rect_poly(FL, FB, BB, BL, COLOR_LEFT)
         
         # 右側面を描画（ダークグレー）
-        # FB(下上) -> FR(右上) -> BR(右下) -> BB(下下) の順で平行四辺形
         self.rect_poly(FB, FR, BR, BB, COLOR_RIGHT)
         
         # 色の決定（ホバー/選択状態を考慮）
@@ -563,7 +536,7 @@ class App:
         
         # ステータス表示
         pyxel.text(5, 195, f"Rotation:{self.current_angle}deg", 7)
-        pyxel.text(5, 205, f"Zoom:{self.zoom:.1f}x", 7)
+        pyxel.text(5, 205, f"Zoom:{self.camera_state.zoom:.1f}x", 7)
         pyxel.text(5, 215, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
         pyxel.text(5, 225, f"Tile:{tile_center.floor_id}", 7)
         
@@ -581,9 +554,9 @@ class App:
         # リセット可能であることを示すヒント
         if self.viewport_x != self.initial_viewport_x or \
            self.viewport_y != self.initial_viewport_y or \
-           self.iso_x_offset != self.initial_iso_x_offset or \
-           self.iso_y_offset != self.initial_iso_y_offset or \
-           self.zoom != self.initial_zoom or \
+           self.camera_state.offset_x != self.initial_camera_state.offset_x or \
+           self.camera_state.offset_y != self.initial_camera_state.offset_y or \
+           self.camera_state.zoom != self.initial_camera_state.zoom or \
            self.rotation_index != self.initial_rotation_index:
             # 選択タイルがない場合のみリセットヒントを表示
             if not self.selected_tile:

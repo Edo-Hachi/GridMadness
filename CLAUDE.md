@@ -126,6 +126,7 @@ GridMadness/
 - ✅ Mouse wheel zoom support
 - ✅ JSON save/load system (F1/F2 keys)
 - ✅ Manual random map generation (F3 key)
+- ✅ Dual compass system with UI and viewport integration
 
 **Final Implementation Features:**
 - **WASD**: Viewport navigation through 256x256 map
@@ -138,6 +139,12 @@ GridMadness/
 - **F2**: Load map data from JSON file
 - **F3**: Generate new random map manually
 - **ESCAPE**: Quit application
+
+**Compass System Features:**
+- **Circular UI Compass**: Right-top corner with rotation-synchronized N/E/S/W labels
+- **Viewport Corner Compass**: Four corners display directional labels that maintain map orientation
+- **Rotation Awareness**: Both compass systems adapt to camera rotation (24-direction support)
+- **Visual Clarity**: N (North) highlighted in red, proper offset positioning for readability
 
 **Map System:**
 - 256x256 full map with Tile dataclass (floor_id, height, attribute, color)
@@ -175,6 +182,15 @@ GridMadness/
 - メモリ効率的なタイル管理
 
 ### Development Log
+
+**2025-07-26: コンパスシステム統合完了**
+- 2つのコンパス表示機能を実装：
+  - **draw_compass_ui()**: 右上角に円形コンパス（回転と同期したUI）
+  - **draw_compass_on_viewport()**: ビューポート四隅にNEWS方角表示
+- 回転対応の方角システム：回転インデックス0-5/6-11/12-17/18-23で90度区間分割
+- 固定オフセット表による視認性向上（±25ピクセル）
+- マップの実際の方向を維持する論理的配置
+- IsometricRendererとの完全統合でズーム/回転時も正確な位置計算
 
 **2025-07-26: モジュール化リファクタリング完了**
 - GridMadness_20250726からIsometricRenderer・MouseHitDetector・ViewportManagerを統合

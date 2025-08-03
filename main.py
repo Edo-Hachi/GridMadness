@@ -7,6 +7,9 @@ from isometric_renderer import IsometricRenderer, CameraState
 from mouse_hit_detector import MouseHitDetector
 from viewport_manager import ViewportManager
 
+#TODO
+#NEWSの方向表示を時計回りに45度オフセットする
+
 # タイルデータ構造
 @dataclass
 class Tile:
@@ -319,19 +322,19 @@ class App:
         camera_angle_deg = self.current_angle
 
         # 各方角のラベルと角度（0度が右）
-        # directions = {
-        #     "N": -45,
-        #     "E": 45,
-        #     "S": 135,
-        #     "W": 225
-        # }
-
         directions = {
-            "N": 0,
-            "E": 90,
-            "S": 180,
-            "W": 270
+            "N": 45,
+            "E": 90+45,
+            "S": 180+45,
+            "W": 270+45
         }
+
+        # directions = {
+        #     "N": 0,
+        #     "E": 90,
+        #     "S": 180,
+        #     "W": 270
+        # }
 
 
         for label, angle_deg in directions.items():
@@ -412,7 +415,15 @@ class App:
                 e_offset = up_offset
                 s_offset = right_offset
                 w_offset = down_offset
+            else:
+                # デフォルト: rotation_indexが範囲外の場合は基準設定を使用
+                n_offset = up_offset
+                e_offset = right_offset
+                s_offset = down_offset
+                w_offset = left_offset
             
+            text_x = 0
+            text_y = 0
             # 各方角に応じたオフセットを適用して表示位置を決定
             if direction == "N":
                 text_x = tile_center_x + n_offset[0]

@@ -6,6 +6,7 @@ from dataclasses import dataclass, asdict
 from isometric_renderer import IsometricRenderer, CameraState
 from mouse_hit_detector import MouseHitDetector
 from viewport_manager import ViewportManager
+from effects_system import EffectsSystem
 
 #TODO
 #NEWSの方向表示を時計回りに45度オフセットする
@@ -238,6 +239,9 @@ class App:
         # JSON操作のフィードバック
         self.last_save_load_message = ""
         self.message_timer = 0
+        
+        # エフェクトシステムを初期化（脳汁放出装置！）
+        self.effects_system = EffectsSystem()
         
         # 256x256のマップグリッドを生成
         self.map_grid = MapGrid(256)
@@ -540,10 +544,23 @@ class App:
         if pyxel.btn(pyxel.KEY_DOWN):
             self.camera_state.offset_y -= 2  # 下キーで上方向に移動（リバース）
         
-        # マウスクリックでタイル選択
+        # マウスクリックでタイル選択 + 脳汁エフェクト発動！
         if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
             if self.hovered_tile:
                 self.selected_tile = self.hovered_tile
+                
+                # クリック位置を画面座標で取得
+                click_x, click_y = pyxel.mouse_x, pyxel.mouse_y
+                
+                # マナ爆発エフェクトを発動（脳汁ドバドバ！）
+                self.effects_system.create_mana_explosion(click_x, click_y, 1.0)
+                
+                # 大当たり判定（パチンコの醍醐味！）
+                if self.effects_system.should_trigger_big_win():
+                    self.effects_system.trigger_big_win()
+                    # 大当たりメッセージを表示
+                    self.last_save_load_message = "🎉 超大当たり！！！ 🎉"
+                    self.message_timer = 240  # 4秒間表示
         
         # JSON保存/読み込み機能
         if pyxel.btnp(pyxel.KEY_F1):  # F1キーで保存
@@ -580,9 +597,19 @@ class App:
             self.last_save_load_message = "Random Map Generated!"
             self.message_timer = 120
         
-        # メッセージタイマーを更新
+        # パフォーマンスモード切り替え（Pキー）
+        if pyxel.btnp(pyxel.KEY_P):
+            self.effects_system.performance_mode = not self.effects_system.performance_mode
+            mode_text = "ON" if self.effects_system.performance_mode else "OFF"
+            self.last_save_load_message = f"パフォーマンスモード: {mode_text}"
+            self.message_timer = 120
+        
+        # メッセージタイマーの更新
         if self.message_timer > 0:
             self.message_timer -= 1
+        
+        # エフェクトシステムの更新（脳汁システム稼働中！）
+        self.effects_system.update()
 
     def rect_poly(self, p0, p1, p2, p3, color):
         """4頂点の平行四辺形を2つの三角形で塗りつぶす"""
@@ -647,6 +674,15 @@ class App:
     def draw(self):
         pyxel.cls(0)
         
+        # 画面振動エフェクトのオフセットを取得
+        shake_x, shake_y = self.effects_system.get_screen_shake_offset()
+        
+        # 画面振動を適用（カメラオフセットに追加）
+        original_offset_x = self.camera_state.offset_x
+        original_offset_y = self.camera_state.offset_y
+        self.camera_state.offset_x += shake_x
+        self.camera_state.offset_y += shake_y
+        
         # マウスオーバー中のタイルを更新
         self.hovered_tile = self.get_tile_at_mouse()
         
@@ -669,6 +705,13 @@ class App:
         self.draw_compass_ui()
         self.draw_compass_on_viewport()
         
+        # 画面振動エフェクトを元に戻す
+        self.camera_state.offset_x = original_offset_x
+        self.camera_state.offset_y = original_offset_y
+        
+        # エフェクトシステムの描画（脳汁エフェクト全開！）
+        self.effects_system.draw()
+        
         # ビューポート情報とタイル色表示を追加
         tile_center = self.current_tiles[8][8]  # 中央タイル
         #pyxel.rect(220, 5, 30, 30, tile_center.color)  # タイル色サンプル
@@ -682,7 +725,8 @@ class App:
         pyxel.text(5, 45, "F1: Save / F2: Load", 7)
         pyxel.text(5, 53, "F3: Random Map", 7)
         pyxel.text(5, 61, "C: Reset view", 7)
-        pyxel.text(5, 69, "ESC: Quit", 7)
+        pyxel.text(5, 69, "P: Performance mode", 7)
+        pyxel.text(5, 77, "ESC: Quit", 7)
         
         # ステータス表示
         pyxel.text(5, 195, f"Rotation:{self.current_angle}deg", 7)

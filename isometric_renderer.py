@@ -190,9 +190,15 @@ class IsometricRenderer:
             grid_x, grid_y, camera_state.rotation, viewport_center
         )
         
-        # 深度 = 回転後のY座標 - 高さ補正
-        depth = rotated_y - height * 0.1
-        return depth
+        # アイソメトリック投影での正しい深度計算
+        # 従来の実装では回転後のY座標のみを使用していたが、これは180度回転時に
+        # Z-ソートが逆転して表示が崩れる問題があった。
+        # アイソメトリック座標系では、奥行き（深度）は回転後のX座標とY座標の
+        # 合計値で正確に表現される。これにより全回転角度で一貫した描画順序を実現。
+        # 修正前: depth = rotated_y - height * 0.1 (Y座標のみ、180度で破綻)
+        # 修正後: iso_depth = rotated_x + rotated_y - height * 0.1 (X+Y座標、全角度対応)
+        iso_depth = rotated_x + rotated_y - height * 0.1
+        return iso_depth
     
     def is_point_in_diamond(self, point_x: float, point_y: float, 
                            diamond_center_x: float, diamond_center_y: float,

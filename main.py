@@ -288,20 +288,7 @@ class App:
     def get_tile_depth(self, grid_x, grid_y):
         """Z-ソート用にタイルの描画順を決めるための深度値を計算する"""
         tile = self.current_tiles[grid_y][grid_x]
-<<<<<<< HEAD
-        
-        # アイソメトリック投影での正しい深度計算
-        # 従来の実装では回転後のY座標のみを使用していたが、これは180度回転時に
-        # Z-ソートが逆転して表示が崩れる問題があった。
-        # アイソメトリック座標系では、奥行き（深度）は回転後のX座標とY座標の
-        # 合計値で正確に表現される。これにより全回転角度で一貫した描画順序を実現。
-        # 修正前: depth = rotated_y - tile.height * 0.1 (Y座標のみ、180度で破綻)
-        # 修正後: iso_depth = rotated_x + rotated_y - tile.height * 0.1 (X+Y座標、全角度対応)
-        iso_depth = rotated_x + rotated_y - tile.height * 0.1
-        return iso_depth
-=======
         return self.iso_renderer.get_tile_depth(grid_x, grid_y, tile.height, self.camera_state)
->>>>>>> f3b987710a8b1856aaf45c09030044031c7cd131
     
     def is_point_in_center_rect(self, point_x, point_y, diamond_center_x, diamond_center_y, diamond_width, diamond_height):
         """中央の矩形を用いたシンプルな当たり判定を行う"""

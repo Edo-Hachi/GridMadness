@@ -1,5 +1,16 @@
+<<<<<<< HEAD
 venv/
 *.pyc
 __pycache__/
 commit.txt
 commit copy.txt
+=======
+./venv/
+*.pyc
+__pycache__/
+commit.txt
+commit.md
+_memo/
+GridMadness_20250726/
+
+>>>>>>> f3b987710a8b1856aaf45c09030044031c7cd131

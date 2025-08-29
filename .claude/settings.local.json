@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python.exe:*)"
+      "Bash(python.exe:*)",
+      "Bash(rm:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }

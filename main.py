@@ -3,19 +3,13 @@ import math
 import random
 import json
 from dataclasses import dataclass, asdict
+from isometric_renderer import IsometricRenderer, CameraState
+from mouse_hit_detector import MouseHitDetector
+from viewport_manager import ViewportManager
+from effects_system import EffectsSystem
 
-# 定数設定
-WIN_WIDTH = 256
-WIN_HEIGHT = 192
-VIEWPORT_SIZE = 16  # 16x16ビューポート
-CELL_SIZE = 16  # タイルサイズを小さく（16x16表示のため）
-HEIGHT_UNIT = 5  # 高さ単位（1段=5ピクセル）
-
-# 色定数
-COLOR_OUTLINE = pyxel.COLOR_WHITE
-COLOR_TOP = pyxel.COLOR_LIME
-COLOR_LEFT = pyxel.COLOR_GRAY   # 左側面（ライトグレー）
-COLOR_RIGHT = pyxel.COLOR_DARK_BLUE  # 右側面（ダークグレー）
+#TODO
+#NEWSの方向表示を時計回りに45度オフセットする
 
 # タイルデータ構造
 @dataclass
@@ -38,18 +32,17 @@ class MapGrid:
     
     def generate_random_map(self):
         """ランダムなマップデータを生成する"""
-        print(f"256x256マップを生成中...")
         
         # 既存のタイルデータをクリア
-        self.tiles = []
+        self.tiles.clear()
         
         # 地形属性の定義
         terrain_types = [
-            {"attribute": 1, "color": pyxel.COLOR_LIME, "name": "草地"},      # 明緑
-            {"attribute": 2, "color": pyxel.COLOR_GREEN, "name": "森"},         # 暗緑
-            {"attribute": 3, "color": pyxel.COLOR_YELLOW, "name": "砂漠"},      # 黄色
-            {"attribute": 4, "color": pyxel.COLOR_NAVY, "name": "海"},         # 青
-            {"attribute": 5, "color": pyxel.COLOR_RED, "name": "山"},         # 赤
+            {"attribute": 1, "color": 11, "name": "草地"},      # 明緑
+            {"attribute": 2, "color": 3, "name": "森"},         # 暗緑
+            {"attribute": 3, "color": 12, "name": "砂漠"},      # 黄色
+            {"attribute": 4, "color": 1, "name": "海"},         # 青
+            {"attribute": 5, "color": 8, "name": "山"},         # 赤
         ]
         
         for y in range(self.map_size):
@@ -75,11 +68,9 @@ class MapGrid:
                 row.append(tile)
             self.tiles.append(row)
         
-        print(f"256x256マップ生成完了！")
     
     def create_empty_map(self):
         """空のマップ（全て基本地形）を生成する"""
-        print(f"空の{self.map_size}x{self.map_size}マップを初期化中...")
         
         for y in range(self.map_size):
             row = []
@@ -90,7 +81,7 @@ class MapGrid:
                 # 基本設定（平坦な草地）
                 height = 1          # 最低高さ
                 attribute = 1       # 草地属性
-                color = pyxel.COLOR_LIME          # 明緑色
+                color = 11          # 明緑色
                 
                 tile = Tile(
                     floor_id=floor_id,
@@ -101,7 +92,6 @@ class MapGrid:
                 row.append(tile)
             self.tiles.append(row)
         
-        print(f"空のマップ初期化完了！")
     
     def get_tile(self, x, y):
         """指定座標のタイルを取得（範囲外チェック付き）"""
@@ -124,7 +114,7 @@ class MapGrid:
                         floor_id=f"{map_x:03d}_{map_y:03d}",
                         height=1,
                         attribute=0,
-                        color=pyxel.COLOR_BLACK  # 黒
+                        color=0  # 黒
                     )
                 row.append(tile)
             viewport.append(row)
@@ -132,7 +122,6 @@ class MapGrid:
     
     def save_to_json(self, filename="map_data.json"):
         """マップデータをJSONファイルに保存"""
-        print(f"マップデータを{filename}に保存中...")
         
         # タイルデータを辞書形式に変換
         map_data = {
@@ -151,15 +140,12 @@ class MapGrid:
         try:
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(map_data, f, ensure_ascii=False, indent=2)
-            print(f"保存完了: {filename}")
             return True
         except Exception as e:
-            print(f"保存エラー: {e}")
             return False
     
     def load_from_json(self, filename="map_data.json"):
         """JSONファイルからマップデータを読み込み"""
-        print(f"{filename}からマップデータを読み込み中...")
         
         try:
             with open(filename, 'r', encoding='utf-8') as f:
@@ -167,7 +153,6 @@ class MapGrid:
             
             # マップサイズの確認
             if map_data["map_size"] != self.map_size:
-                print(f"警告: ファイルのマップサイズ({map_data['map_size']})が異なります")
                 return False
             
             # タイルデータを復元
@@ -184,27 +169,43 @@ class MapGrid:
                     )
                     row.append(tile)
                 new_tiles.append(row)
-
+            
             # 既存のタイルデータを置き換え
             self.tiles = new_tiles
-            print(f"読み込み完了: {filename}")
             return True
             
         except FileNotFoundError:
-            print(f"ファイルが見つかりません: {filename}")
             return False
         except Exception as e:
-            print(f"読み込みエラー: {e}")
             return False
 
+# 定数設定
+WIN_WIDTH = 256
+WIN_HEIGHT = 256
+VIEWPORT_SIZE = 16  # 16x16ビューポート
+CELL_SIZE = 16  # タイルサイズを小さく（16x16表示のため）
+HEIGHT_UNIT = 3  # 高さ1段あたり3ピクセル
 
+# 色定数
+COLOR_OUTLINE = 7
+COLOR_TOP = 11
+COLOR_LEFT = 6   # 左側面（ライトグレー）
+COLOR_RIGHT = 5  # 右側面（ダークグレー）
 
 class App:
     def __init__(self):
-        # カメラパラメータ
-        self.iso_x_offset = 0
-        self.iso_y_offset = 0
-        self.zoom = 1.0
+        # IsometricRendererを初期化
+        self.iso_renderer = IsometricRenderer(cell_size=CELL_SIZE, height_unit=HEIGHT_UNIT)
+        
+        # カメラ状態を管理するCameraStateオブジェクト
+        self.camera_state = CameraState(
+            rotation=0.0,
+            zoom=1.0,
+            offset_x=0.0,
+            offset_y=0.0,
+            center_x=WIN_WIDTH // 2,
+            center_y=WIN_HEIGHT // 2
+        )
         
         # ビューポート位置（256x256マップ内の表示開始位置）
         self.viewport_x = 120  # マップ中央付近から開始
@@ -216,12 +217,17 @@ class App:
         self.rotation_index = 0  # 現在の回転ステップ番号
         self.max_rotations = 360 // self.rotation_step  # 24方向
         
-        # 初期値の保存（Aキーでリセットするため）
+        # 初期値の保存（リセット用）
         self.initial_viewport_x = self.viewport_x
         self.initial_viewport_y = self.viewport_y
-        self.initial_iso_x_offset = self.iso_x_offset
-        self.initial_iso_y_offset = self.iso_y_offset
-        self.initial_zoom = self.zoom
+        self.initial_camera_state = CameraState(
+            rotation=0.0,
+            zoom=1.0,
+            offset_x=0.0,
+            offset_y=0.0,
+            center_x=WIN_WIDTH // 2,
+            center_y=WIN_HEIGHT // 2
+        )
         self.initial_rotation_index = self.rotation_index
         
         # マウス座標や選択状態
@@ -234,9 +240,24 @@ class App:
         self.last_save_load_message = ""
         self.message_timer = 0
         
+        # エフェクトシステムを初期化（脳汁放出装置！）
+        self.effects_system = EffectsSystem()
+        
         # 256x256のマップグリッドを生成
-        print("MapGridを初期化中...")
         self.map_grid = MapGrid(256)
+        
+        # ViewportManagerを初期化
+        self.viewport_manager = ViewportManager(self.map_grid, viewport_size=VIEWPORT_SIZE)
+        self.viewport_manager.set_viewport_position(self.viewport_x, self.viewport_y)
+        
+        # MouseHitDetectorを初期化
+        self.mouse_hit_detector = MouseHitDetector(
+            self.iso_renderer, 
+            self.viewport_manager,
+            cell_size=CELL_SIZE,
+            height_unit=HEIGHT_UNIT,
+            debug_mode=False
+        )
         
         # 現在のビューポートタイルを取得
         self.update_viewport_tiles()
@@ -247,34 +268,27 @@ class App:
     
     def update_viewport_tiles(self):
         """現在のビューポート位置から16x16タイルを取得"""
-        self.current_tiles = self.map_grid.get_viewport_tiles(
-            self.viewport_x, self.viewport_y, self.viewport_size
-        )
+        # ViewportManagerの位置を更新
+        self.viewport_manager.set_viewport_position(self.viewport_x, self.viewport_y)
+        
+        
+        # 修正版ViewportManagerを使用（force_update付き）
+        self.current_tiles = self.viewport_manager.get_current_tiles()
+        
     
     @property
     def current_angle(self):
         """現在の回転角度(度)を返す"""
         return self.rotation_index * self.rotation_step
     
-    def get_rotated_coordinates(self, grid_x, grid_y):
-        """現在の回転角度を用いてグリッド座標を回転させる"""
-        angle_rad = math.radians(self.current_angle)
-        
-        # グリッド中心からの相対座標
-        center = self.viewport_size // 2
-        rel_x = grid_x - center
-        rel_y = grid_y - center
-        
-        # 回転変換
-        rotated_x = rel_x * math.cos(angle_rad) - rel_y * math.sin(angle_rad)
-        rotated_y = rel_x * math.sin(angle_rad) + rel_y * math.cos(angle_rad)
-        
-        return rotated_x, rotated_y
+    def update_camera_rotation(self):
+        """回転インデックスからカメラ状態を更新"""
+        self.camera_state.rotation = self.current_angle
     
     def get_tile_depth(self, grid_x, grid_y):
         """Z-ソート用にタイルの描画順を決めるための深度値を計算する"""
-        rotated_x, rotated_y = self.get_rotated_coordinates(grid_x, grid_y)
         tile = self.current_tiles[grid_y][grid_x]
+<<<<<<< HEAD
         
         # アイソメトリック投影での正しい深度計算
         # 従来の実装では回転後のY座標のみを使用していたが、これは180度回転時に
@@ -285,6 +299,9 @@ class App:
         # 修正後: iso_depth = rotated_x + rotated_y - tile.height * 0.1 (X+Y座標、全角度対応)
         iso_depth = rotated_x + rotated_y - tile.height * 0.1
         return iso_depth
+=======
+        return self.iso_renderer.get_tile_depth(grid_x, grid_y, tile.height, self.camera_state)
+>>>>>>> f3b987710a8b1856aaf45c09030044031c7cd131
     
     def is_point_in_center_rect(self, point_x, point_y, diamond_center_x, diamond_center_y, diamond_width, diamond_height):
         """中央の矩形を用いたシンプルな当たり判定を行う"""
@@ -298,51 +315,150 @@ class App:
         return left <= point_x <= right and top <= point_y <= bottom
     
     def get_tile_at_mouse(self):
-        """マウスカーソル下にあるタイルを返す"""
-        center_x = WIN_WIDTH // 2
-        center_y = WIN_HEIGHT // 2
-
-        # 全タイルを走査してマウス座標との当たりを検出
-        for y in range(self.viewport_size):
-            for x in range(self.viewport_size):
-                tile = self.current_tiles[y][x]
-                height = tile.height
-                
-                # 回転座標を取得
-                rotated_x, rotated_y = self.get_rotated_coordinates(x, y)
-                
-                # draw_diamond_tileと同じ座標計算を使用
-                base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
-                base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset - height * HEIGHT_UNIT
-                
-                # ズーム適用（ウィンドウ中心を基準）
-                iso_x = center_x + (base_iso_x - center_x) * self.zoom
-                iso_y = center_y + (base_iso_y - center_y) * self.zoom
-                
-                # ズーム適用されたセルサイズ
-                scaled_cell_size = int(CELL_SIZE * self.zoom)
-                
-                # ダイアモンド（ひし形）上面の4頂点を計算（draw_diamond_tileと同じ）
-                FT = (iso_x + scaled_cell_size // 2, iso_y)                           # 上
-                FL = (iso_x, iso_y + scaled_cell_size // 4)                          # 左
-                FR = (iso_x + scaled_cell_size, iso_y + scaled_cell_size // 4)       # 右
-                FB = (iso_x + scaled_cell_size // 2, iso_y + scaled_cell_size // 2)  # 下
-                
-                # ひし形の中心座標を正確に計算
-                diamond_center_x = (FL[0] + FR[0]) / 2  # 左右の中点
-                diamond_center_y = (FT[1] + FB[1]) / 2  # 上下の中点
-                
-                # ひし形のサイズ
-                diamond_width = scaled_cell_size
-                diamond_height = scaled_cell_size // 2
-                
-                # 中心矩形で当たり判定
-                if self.is_point_in_center_rect(self.mouse_x, self.mouse_y, 
-                                               diamond_center_x, diamond_center_y, 
-                                               diamond_width, diamond_height):
-                    return (x, y)
+        """マウスカーソル下にあるタイルを返す（MouseHitDetector使用）"""
+        return self.mouse_hit_detector.get_tile_at_mouse(
+            self.mouse_x, self.mouse_y, 
+            self.camera_state, 
+            self.current_tiles,
+            WIN_WIDTH, WIN_HEIGHT
+        )
+    
+    def draw_compass_ui(self):
+        """画面の右上に、回転と同期したUIコンパスを描画する"""
         
-        return None
+        # コンパスの中心座標と半径（画面の右上）
+        compass_center_x = WIN_WIDTH - 25
+        compass_center_y = 25
+        radius = 20
+
+        # コンパスの背景円
+        pyxel.circb(compass_center_x, compass_center_y, radius, 7) # 外枠
+        pyxel.circ(compass_center_x, compass_center_y, radius - 6, 0) # 内側を黒で塗りつぶし
+
+        # 現在のカメラの回転角度（度）
+        camera_angle_deg = self.current_angle
+
+        # 各方角のラベルと角度（0度が右）
+        directions = {
+            "N": 45,
+            "E": 90+45,
+            "S": 180+45,
+            "W": 270+45
+        }
+
+        # directions = {
+        #     "N": 0,
+        #     "E": 90,
+        #     "S": 180,
+        #     "W": 270
+        # }
+
+
+        for label, angle_deg in directions.items():
+            # カメラの回転を適用した最終的な角度
+            final_angle_deg = angle_deg + camera_angle_deg
+            final_angle_rad = math.radians(final_angle_deg)
+
+            # ラベルの描画位置を計算
+            text_x = compass_center_x + (radius - 4) * math.sin(final_angle_rad)
+            text_y = compass_center_y - (radius - 4) * math.cos(final_angle_rad)
+
+            # 北（N）を赤で強調表示
+            color = 8 if label == "N" else 7
+
+            # 文字を描画（中央揃えのため微調整）
+            pyxel.text(
+                int(text_x - pyxel.FONT_WIDTH / 2),
+                int(text_y - pyxel.FONT_HEIGHT / 2),
+                label,
+                color
+            )
+
+    def draw_compass_on_viewport(self):
+        """ビューポート四隅にNEWS方角を表示（回転対応）"""
+        
+        # 4つの角の座標と、その位置に表示する固定の方角
+        compass_positions = [
+            (0, 0, "N"),                    # 左上の角に北（N）
+            (0, self.viewport_size-1, "W"), # 左下の角に西（W）
+            (self.viewport_size-1, 0, "E"), # 右上の角に東（E）
+            (self.viewport_size-1, self.viewport_size-1, "S") # 右下の角に南（S）
+        ]
+        
+        for grid_x, grid_y, direction in compass_positions:
+            # IsometricRendererを使用してタイル座標を取得
+            tile = self.current_tiles[grid_y][grid_x]
+            iso_x, iso_y = self.iso_renderer.grid_to_iso(grid_x, grid_y, tile.height, self.camera_state)
+            
+            # ズーム適用されたセルサイズ
+            scaled_cell_size = int(CELL_SIZE * self.camera_state.zoom)
+            
+            # ひし形の中心座標を計算
+            tile_center_x = iso_x + scaled_cell_size // 2
+            tile_center_y = iso_y + scaled_cell_size // 4
+            
+            # 固定オフセット表（マップの実際の方向を指すための4つの基本方向）
+            up_offset = (0, -25)      # 上方向（マップの北）
+            right_offset = (25, 0)    # 右方向（マップの東）  
+            down_offset = (0, 25)     # 下方向（マップの南）
+            left_offset = (-25, 0)    # 左方向（マップの西）
+            
+            # 回転に応じてN/E/S/Wの表示方向を割り当て
+            # これにより、ビューポートが回転してもマップの実際の方向を指す
+            if 0 <= self.rotation_index <= 5:
+                # 0-5: 基準（N=上, E=右, S=下, W=左）
+                n_offset = up_offset
+                e_offset = right_offset
+                s_offset = down_offset
+                w_offset = left_offset
+                
+            elif 6 <= self.rotation_index <= 11:
+                # 6-11: 90度回転（N=右, E=下, S=左, W=上）
+                n_offset = right_offset
+                e_offset = down_offset
+                s_offset = left_offset
+                w_offset = up_offset
+                
+            elif 12 <= self.rotation_index <= 17:
+                # 12-17: 180度回転（N=下, E=左, S=上, W=右）
+                n_offset = down_offset
+                e_offset = left_offset
+                s_offset = up_offset
+                w_offset = right_offset
+                
+            elif 18 <= self.rotation_index <= 23:
+                # 18-23: 270度回転（N=左, E=上, S=右, W=下）
+                n_offset = left_offset
+                e_offset = up_offset
+                s_offset = right_offset
+                w_offset = down_offset
+            else:
+                # デフォルト: rotation_indexが範囲外の場合は基準設定を使用
+                n_offset = up_offset
+                e_offset = right_offset
+                s_offset = down_offset
+                w_offset = left_offset
+            
+            text_x = 0
+            text_y = 0
+            # 各方角に応じたオフセットを適用して表示位置を決定
+            if direction == "N":
+                text_x = tile_center_x + n_offset[0]
+                text_y = tile_center_y + n_offset[1]
+            elif direction == "E":
+                text_x = tile_center_x + e_offset[0]
+                text_y = tile_center_y + e_offset[1]
+            elif direction == "S":
+                text_x = tile_center_x + s_offset[0]
+                text_y = tile_center_y + s_offset[1]
+            elif direction == "W":
+                text_x = tile_center_x + w_offset[0]
+                text_y = tile_center_y + w_offset[1]
+            
+            # 画面範囲内チェック
+            if 0 <= text_x < WIN_WIDTH and 0 <= text_y < WIN_HEIGHT:
+                # 方角文字を描画（赤色で目立つように）
+                pyxel.text(int(text_x), int(text_y), direction, 8)
 
     def update(self):
         if pyxel.btnp(pyxel.KEY_ESCAPE):
@@ -379,59 +495,85 @@ class App:
         # 回転処理（Q/Eキー）
         if pyxel.btnp(pyxel.KEY_Q):  # 反時計回り
             self.rotation_index = (self.rotation_index - 1) % self.max_rotations
+            self.update_camera_rotation()
         if pyxel.btnp(pyxel.KEY_E):  # 時計回り（Wの代わりにE）
             self.rotation_index = (self.rotation_index + 1) % self.max_rotations
+            self.update_camera_rotation()
         
         # ズーム機能（Z/Xキー）
         if pyxel.btn(pyxel.KEY_Z):
-            self.zoom += 0.05  # 少しずつズーム
-            if self.zoom > 3.0:  # 最大3倍まで
-                self.zoom = 3.0
+            self.camera_state.zoom += 0.05  # 少しずつズーム
+            if self.camera_state.zoom > 3.0:  # 最大3倍まで
+                self.camera_state.zoom = 3.0
         if pyxel.btn(pyxel.KEY_X):
-            self.zoom -= 0.05  # 少しずつズームアウト
-            if self.zoom < 0.3:  # 最小0.3倍まで
-                self.zoom = 0.3
+            self.camera_state.zoom -= 0.05  # 少しずつズームアウト
+            if self.camera_state.zoom < 0.3:  # 最小0.3倍まで
+                self.camera_state.zoom = 0.3
         
         # マウスホイールズーム
         wheel_y = pyxel.mouse_wheel
         if wheel_y > 0:  # ホイール前方向（上）= ズームイン
-            self.zoom += 0.1
-            if self.zoom > 3.0:
-                self.zoom = 3.0
+            self.camera_state.zoom += 0.1
+            if self.camera_state.zoom > 3.0:
+                self.camera_state.zoom = 3.0
         elif wheel_y < 0:  # ホイール後方向（下）= ズームアウト
-            self.zoom -= 0.1
-            if self.zoom < 0.3:
-                self.zoom = 0.3
+            self.camera_state.zoom -= 0.1
+            if self.camera_state.zoom < 0.3:
+                self.camera_state.zoom = 0.3
         
         # リセット処理（Cキー）
         if pyxel.btnp(pyxel.KEY_C):
             # ビューポートを中央に戻す
             self.viewport_x = self.initial_viewport_x
             self.viewport_y = self.initial_viewport_y
-            # カメラオフセットをリセット
-            self.iso_x_offset = self.initial_iso_x_offset
-            self.iso_y_offset = self.initial_iso_y_offset
-            # ズームをリセット
-            self.zoom = self.initial_zoom
+            # カメラ状態をリセット
+            self.camera_state = CameraState(
+                rotation=self.initial_camera_state.rotation,
+                zoom=self.initial_camera_state.zoom,
+                offset_x=self.initial_camera_state.offset_x,
+                offset_y=self.initial_camera_state.offset_y,
+                center_x=self.initial_camera_state.center_x,
+                center_y=self.initial_camera_state.center_y
+            )
             # 回転をリセット
             self.rotation_index = self.initial_rotation_index
+            self.update_camera_rotation()
+            
+            # 各種キャッシュをクリア（ViewportManagerが自動でcurrent_tilesも更新）
+            self.iso_renderer.clear_cache()
+            self.viewport_manager.clear_cache()
+            self.mouse_hit_detector.clear_cache()
+            
             # ビューポートタイルを更新
             self.update_viewport_tiles()
         
         # 矢印キーでカメラ移動（表示位置の微調整）
         if pyxel.btn(pyxel.KEY_LEFT):
-            self.iso_x_offset -= 2
+            self.camera_state.offset_x += 2  # 左キーで右方向に移動（リバース）
         if pyxel.btn(pyxel.KEY_RIGHT):
-            self.iso_x_offset += 2
+            self.camera_state.offset_x -= 2  # 右キーで左方向に移動（リバース）
         if pyxel.btn(pyxel.KEY_UP):
-            self.iso_y_offset -= 2
+            self.camera_state.offset_y += 2  # 上キーで下方向に移動（リバース）
         if pyxel.btn(pyxel.KEY_DOWN):
-            self.iso_y_offset += 2
+            self.camera_state.offset_y -= 2  # 下キーで上方向に移動（リバース）
         
-        # マウスクリックでタイル選択
+        # マウスクリックでタイル選択 + 脳汁エフェクト発動！
         if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
             if self.hovered_tile:
                 self.selected_tile = self.hovered_tile
+                
+                # クリック位置を画面座標で取得
+                click_x, click_y = pyxel.mouse_x, pyxel.mouse_y
+                
+                # マナ爆発エフェクトを発動（脳汁ドバドバ！）
+                self.effects_system.create_mana_explosion(click_x, click_y, 1.0)
+                
+                # 大当たり判定（パチンコの醍醐味！）
+                if self.effects_system.should_trigger_big_win():
+                    self.effects_system.trigger_big_win()
+                    # 大当たりメッセージを表示
+                    self.last_save_load_message = "🎉 超大当たり！！！ 🎉"
+                    self.message_timer = 240  # 4秒間表示
         
         # JSON保存/読み込み機能
         if pyxel.btnp(pyxel.KEY_F1):  # F1キーで保存
@@ -441,6 +583,12 @@ class App:
         
         if pyxel.btnp(pyxel.KEY_F2):  # F2キーで読み込み
             if self.map_grid.load_from_json():
+                # 各種キャッシュをクリア（ViewportManagerが自動でcurrent_tilesも更新）
+                self.iso_renderer.clear_cache()
+                self.viewport_manager.clear_cache()
+                self.mouse_hit_detector.clear_cache()
+                
+                
                 # 読み込み成功時、ビューポートを更新
                 self.update_viewport_tiles()
                 self.last_save_load_message = "Map Loaded!"
@@ -451,13 +599,30 @@ class App:
         
         if pyxel.btnp(pyxel.KEY_F3):  # F3キーでランダムマップ生成
             self.map_grid.generate_random_map()
+            
+            
+            # 各種キャッシュをクリア（ViewportManagerが自動でcurrent_tilesも更新）
+            self.iso_renderer.clear_cache()
+            self.viewport_manager.clear_cache()
+            self.mouse_hit_detector.clear_cache()
+            
             self.update_viewport_tiles()
             self.last_save_load_message = "Random Map Generated!"
             self.message_timer = 120
         
-        # メッセージタイマーを更新
+        # パフォーマンスモード切り替え（Pキー）
+        if pyxel.btnp(pyxel.KEY_P):
+            self.effects_system.performance_mode = not self.effects_system.performance_mode
+            mode_text = "ON" if self.effects_system.performance_mode else "OFF"
+            self.last_save_load_message = f"パフォーマンスモード: {mode_text}"
+            self.message_timer = 120
+        
+        # メッセージタイマーの更新
         if self.message_timer > 0:
             self.message_timer -= 1
+        
+        # エフェクトシステムの更新（脳汁システム稼働中！）
+        self.effects_system.update()
 
     def rect_poly(self, p0, p1, p2, p3, color):
         """4頂点の平行四辺形を2つの三角形で塗りつぶす"""
@@ -473,49 +638,32 @@ class App:
 
     def draw_diamond_tile(self, grid_x, grid_y):
         """指定されたグリッド位置にダイアモンド型タイルを高さ付きで描画"""
-        center_x = WIN_WIDTH // 2
-        center_y = WIN_HEIGHT // 2
-        
         # 現在のビューポートタイルから高さを取得
         tile = self.current_tiles[grid_y][grid_x]
-        height = tile.height
         
-        # 回転座標を取得
-        rotated_x, rotated_y = self.get_rotated_coordinates(grid_x, grid_y)
+        # IsometricRendererを使用してアイソメトリック座標を計算
+        iso_x, iso_y = self.iso_renderer.grid_to_iso(grid_x, grid_y, tile.height, self.camera_state)
         
-        # 回転後のアイソメトリック座標計算
-        base_iso_x = (rotated_x - rotated_y) * (CELL_SIZE // 2) + center_x + self.iso_x_offset
-        base_iso_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset - height * HEIGHT_UNIT
+        # ズーム適用されたセルサイズ
+        scaled_cell_size = int(CELL_SIZE * self.camera_state.zoom)
         
-        # ズーム適用（ウィンドウ中心を基準）
-        iso_x = center_x + (base_iso_x - center_x) * self.zoom
-        iso_y = center_y + (base_iso_y - center_y) * self.zoom
+        # IsometricRendererを使用してダイアモンドの頂点座標を計算
+        # 注意: ズームとスケールを適用した高さ情報も渡す
+        vertices = self.iso_renderer.calculate_diamond_vertices(iso_x, iso_y, scaled_cell_size, tile.height, self.camera_state.zoom)
         
-        # 地面レベル座標もズーム適用（回転座標使用）
-        base_ground_y = (rotated_x + rotated_y) * (CELL_SIZE // 4) + center_y + self.iso_y_offset
-        ground_y = center_y + (base_ground_y - center_y) * self.zoom
-        
-        # ズーム適用されたセルサイズと高さ単位
-        scaled_cell_size = int(CELL_SIZE * self.zoom)
-        scaled_height_unit = int(HEIGHT_UNIT * self.zoom)
-        
-        # ダイアモンド（ひし形）上面の4頂点を計算
-        FT = (iso_x + scaled_cell_size // 2, iso_y)                           # 上
-        FL = (iso_x, iso_y + scaled_cell_size // 4)                          # 左
-        FR = (iso_x + scaled_cell_size, iso_y + scaled_cell_size // 4)       # 右
-        FB = (iso_x + scaled_cell_size // 2, iso_y + scaled_cell_size // 2)  # 下
-        
-        # 壁面（側面）の下側座標を地面レベル基準で計算
-        BL = (FL[0], ground_y + scaled_cell_size // 4)   # 左側面の下
-        BR = (FR[0], ground_y + scaled_cell_size // 4)   # 右側面の下
-        BB = (FB[0], ground_y + scaled_cell_size // 2)   # 下側面の下
+        # 頂点を取得
+        FT = vertices['top']
+        FL = vertices['left']
+        FR = vertices['right']
+        FB = vertices['bottom']
+        BL = vertices['bottom_left']
+        BR = vertices['bottom_right']
+        BB = vertices['bottom_bottom']
         
         # 左側面を描画（ライトグレー）
-        # FL(左上) -> FB(下上) -> BB(下下) -> BL(左下) の順で平行四辺形
         self.rect_poly(FL, FB, BB, BL, COLOR_LEFT)
         
         # 右側面を描画（ダークグレー）
-        # FB(下上) -> FR(右上) -> BR(右下) -> BB(下下) の順で平行四辺形
         self.rect_poly(FB, FR, BR, BB, COLOR_RIGHT)
         
         # 色の決定（ホバー/選択状態を考慮）
@@ -526,9 +674,9 @@ class App:
         is_selected = self.selected_tile == (grid_x, grid_y)
         
         if is_selected:
-            top_color = pyxel.COLOR_LIGHT_BLUE  # 青色（選択状態）
+            top_color = 9  # 青色（選択状態）
         elif is_hovered:
-            top_color = pyxel.COLOR_CYAN  # 緑色（ホバー状態）
+            top_color = 10  # 緑色（ホバー状態）
         
         # 上面（ひし形）を描画
         self.rect_poly(FL, FT, FR, FB, top_color)
@@ -537,7 +685,16 @@ class App:
         self.rect_polyb(FT, FL, FB, FR, COLOR_OUTLINE)
 
     def draw(self):
-        pyxel.cls(pyxel.COLOR_BLACK)
+        pyxel.cls(0)
+        
+        # 画面振動エフェクトのオフセットを取得
+        shake_x, shake_y = self.effects_system.get_screen_shake_offset()
+        
+        # 画面振動を適用（カメラオフセットに追加）
+        original_offset_x = self.camera_state.offset_x
+        original_offset_y = self.camera_state.offset_y
+        self.camera_state.offset_x += shake_x
+        self.camera_state.offset_y += shake_y
         
         # マウスオーバー中のタイルを更新
         self.hovered_tile = self.get_tile_at_mouse()
@@ -557,9 +714,20 @@ class App:
         for depth, x, y in tiles_with_depth:
             self.draw_diamond_tile(x, y)
         
+        # 方角表示を描画
+        self.draw_compass_ui()
+        self.draw_compass_on_viewport()
+        
+        # 画面振動エフェクトを元に戻す
+        self.camera_state.offset_x = original_offset_x
+        self.camera_state.offset_y = original_offset_y
+        
+        # エフェクトシステムの描画（脳汁エフェクト全開！）
+        self.effects_system.draw()
+        
         # ビューポート情報とタイル色表示を追加
         tile_center = self.current_tiles[8][8]  # 中央タイル
-        pyxel.rect(220, 5, 30, 30, tile_center.color)  # タイル色サンプル
+        #pyxel.rect(220, 5, 30, 30, tile_center.color)  # タイル色サンプル
         
         # 操作説明
         pyxel.text(5, 5, "WASD: Move viewport", 7)
@@ -570,11 +738,12 @@ class App:
         pyxel.text(5, 45, "F1: Save / F2: Load", 7)
         pyxel.text(5, 53, "F3: Random Map", 7)
         pyxel.text(5, 61, "C: Reset view", 7)
-        pyxel.text(5, 69, "ESC: Quit", 7)
+        pyxel.text(5, 69, "P: Performance mode", 7)
+        pyxel.text(5, 77, "ESC: Quit", 7)
         
         # ステータス表示
         pyxel.text(5, 195, f"Rotation:{self.current_angle}deg", 7)
-        pyxel.text(5, 205, f"Zoom:{self.zoom:.1f}x", 7)
+        pyxel.text(5, 205, f"Zoom:{self.camera_state.zoom:.1f}x", 7)
         pyxel.text(5, 215, f"Pos:({self.viewport_x},{self.viewport_y})", 7)
         pyxel.text(5, 225, f"Tile:{tile_center.floor_id}", 7)
         
@@ -592,9 +761,9 @@ class App:
         # リセット可能であることを示すヒント
         if self.viewport_x != self.initial_viewport_x or \
            self.viewport_y != self.initial_viewport_y or \
-           self.iso_x_offset != self.initial_iso_x_offset or \
-           self.iso_y_offset != self.initial_iso_y_offset or \
-           self.zoom != self.initial_zoom or \
+           self.camera_state.offset_x != self.initial_camera_state.offset_x or \
+           self.camera_state.offset_y != self.initial_camera_state.offset_y or \
+           self.camera_state.zoom != self.initial_camera_state.zoom or \
            self.rotation_index != self.initial_rotation_index:
             # 選択タイルがない場合のみリセットヒントを表示
             if not self.selected_tile:
